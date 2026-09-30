@@ -221,19 +221,25 @@ sudo systemctl enable --now nut-whatsapp.service
 
 ## 🌐 Configurações de Rede & Rotas Estáticas
 
-Para permitir que o servidor da aplicação (`10.255.255.28/24`) comunique com nós de virtualização e infraestrutura localizados em sub-redes internas como `192.168.4.0/23`, certifique-se de configurar a rota estática persistente no Netplan (`/etc/netplan/50-cloud-init.yaml`):
+Para permitir que o servidor da aplicação (`10.255.255.28/24`) comunique com nós de virtualização e infraestrutura localizados em sub-redes internas como `192.168.4.0/23` e `192.168.10.0/23`, certifique-se de configurar as rotas estáticas persistentes no Netplan (`/etc/netplan/50-cloud-init.yaml`):
 
 ```yaml
 network:
   version: 2
+  renderer: networkd
   ethernets:
-    ens18:
+    ens192:
+      dhcp4: false
       addresses:
         - 10.255.255.28/24
       routes:
         - to: default
-          via: 10.255.255.1
+          via: 10.255.255.254
+          metric: 100
+          on-link: true
         - to: 192.168.4.0/23
+          via: 10.255.255.251
+        - to: 192.168.10.0/23
           via: 10.255.255.251
       nameservers:
         addresses:
