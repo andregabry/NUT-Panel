@@ -1,0 +1,203 @@
+/* Enging UPS System - Pure Light Theme & Custom Animations */
+
+:root {
+    --color-enging-navy: #223546;
+    --color-enging-orange: #e95c0c;
+    --color-enging-blue: #184e8e;
+}
+
+body {
+    background-color: #f8fafc;
+    color: #1e293b;
+}
+
+/* Primary and Secondary Sidebars (Lingueta / Tab Design) */
+.sidebar-primary {
+    background-color: #121921 !important;
+    width: 68px;
+}
+
+.sidebar-secondary {
+    background-color: #1c2836 !important;
+    width: 190px;
+}
+
+/* Primary Tab Button (Active - Lingueta attached to secondary column) */
+.primary-tab-btn-active {
+    position: relative;
+    width: calc(100% + 1px) !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    background-color: #1c2836 !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border-radius: 0 !important;
+    border-left: 4px solid #e95c0c !important;
+    border-right: none !important;
+    margin-right: -1px;
+    z-index: 30;
+    transition: background-color 0.15s ease-in-out;
+}
+
+/* Primary Tab Button (Inactive) */
+.primary-tab-btn-inactive {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    background-color: transparent;
+    color: #64748b !important;
+    font-weight: 500;
+    border-radius: 0 !important;
+    border-left: 4px solid transparent;
+    transition: all 0.15s ease-in-out;
+}
+
+.primary-tab-btn-inactive:hover {
+    color: #f1f5f9 !important;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Top Navbar Orange Line */
+.navbar-top-orange {
+    border-top: 4px solid #e95c0c !important;
+}
+
+/* Secondary Submenu Item (Active) */
+.submenu-nav-link-active {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+    color: #ffffff !important;
+    font-weight: 700;
+    font-size: 0.82rem;
+    background-color: #15202c !important;
+    border-left: 3px solid #e95c0c !important;
+    border-radius: 0 !important;
+    transition: all 0.15s ease;
+}
+
+/* Secondary Submenu Item (Inactive) */
+.submenu-nav-link-inactive {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+    color: #8fa0b5 !important;
+    font-weight: 500;
+    font-size: 0.82rem;
+    border-left: 3px solid transparent;
+    border-radius: 0 !important;
+    transition: all 0.15s ease;
+}
+
+.submenu-nav-link-inactive:hover {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.04);
+    border-left: 3px solid rgba(233, 92, 12, 0.4);
+}
+
+.flow-card {
+    position: relative;
+    background-color: #ffffff;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.flow-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(34, 53, 70, 0.08);
+}
+
+.kpi-card {
+    background-color: #ffffff;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(34, 53, 70, 0.08);
+    border-color: #cbd5e1;
+}
+
+/* SweetAlert2 Pure Light Theme Overrides */
+.swal2-popup {
+    background: #ffffff !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 1.25rem !important;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.15) !important;
+}
+
+.swal2-title {
+    color: #223546 !important;
+    font-weight: 700 !important;
+}
+
+.swal2-html-container {
+    color: #475569 !important;
+}
+
+.swal2-input, .swal2-file, .swal2-textarea, .swal2-select {
+    background: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
+    border-radius: 0.75rem !important;
+}
+
+.swal2-input:focus, .swal2-textarea:focus, .swal2-select:focus {
+    border-color: #e95c0c !important;
+    box-shadow: 0 0 0 3px rgba(233, 92, 12, 0.15) !important;
+}
+
+/* Custom Scrollbar for Light Theme */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* WhatsApp Web Chat Modal without outer scroll */
+.swal-chat-modal {
+    padding: 0 !important;
+    overflow: hidden !important;
+    border-radius: 1.5rem !important;
+    background: transparent !important;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.3) !important;
+    border: none !important;
+}
+
+.swal-chat-modal .swal2-html-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    max-height: none !important;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+

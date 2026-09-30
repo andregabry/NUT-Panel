@@ -1,0 +1,24 @@
+{
+  "enabled": true,
+  "trigger_battery_pct": 30.0,
+  "require_on_battery": true,
+  "grace_period_sec": 10,
+  "servers": [
+    {
+      "id": "caac4449-7d1c-4a6b-b79d-6a30196292a5",
+      "name": "Exemplo - Servidor Linux / Proxmox",
+      "host": "192.168.1.100",
+      "port": 22,
+      "method": "ssh",
+      "username": "root",
+      "auth_type": "password",
+      "password": "",
+      "sudo": false,
+      "custom_command": "shutdown -h now",
+      "delay_sec": 0,
+      "enabled": false,
+      "last_test": null
+    }
+  ],
+  "logs": []
+}

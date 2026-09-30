@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enging UPS System | Monitor & Automação</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        enging: {
+                            navy: '#223546',
+                            'navy-dark': '#192836',
+                            'navy-light': '#2c4358',
+                            orange: '#e95c0c',
+                            'orange-hover': '#d04f08',
+                            'orange-light': '#fff3ed',
+                            'orange-subtle': 'rgba(233, 92, 12, 0.08)',
+                            blue: '#184e8e',
+                            slate: '#f8fafc'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css?v=3.4">
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen antialiased flex font-sans selection:bg-enging-orange selection:text-white">
+
+    <!-- Mobile Backdrop -->
+    <div id="mobile-sidebar-backdrop" onclick="toggleSidebar(false)" class="fixed inset-0 bg-black/50 backdrop-blur-xs z-40 hidden md:hidden"></div>
+
+    <!-- ========================================================================= -->
+    <!-- DUAL DARK SIDEBAR (ENGING TAB / LINGUETA BRAND DESIGN)                    -->
+    <!-- ========================================================================= -->
+    <aside id="app-sidebar" class="fixed inset-y-0 left-0 z-50 flex transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl">
+        
+        <!-- 1. Left Primary Icon Column (Width: 70px) -->
+        <div class="w-[70px] sidebar-primary border-r border-[#192533] flex flex-col justify-between items-center py-4 select-none relative z-20">
+            
+            <!-- Top Brand Icon -->
+            <div class="flex flex-col items-center gap-5 w-full">
+                <div class="w-10 h-10 flex items-center justify-center text-enging-orange">
+                    <i data-lucide="layers" class="w-7 h-7 text-enging-orange stroke-[2.5]"></i>
+                </div>
+
+                <!-- Primary Nav Tabs (Linguetas) -->
+                <nav class="w-full space-y-2 pr-0 pl-1.5">
+                    
+                    <!-- Tab 1: Status -->
+                    <button id="primary-nav-status" onclick="switchMainView('status', 'overview')" class="primary-tab-btn-active" title="Status e Telemetria">
+                        <i data-lucide="activity" class="w-5 h-5 mb-1"></i>
+                        <span class="text-[11px] tracking-tight font-bold">Status</span>
+                    </button>
+
+                    <!-- Tab 2: Automatization -->
+                    <button id="primary-nav-auto" onclick="switchMainView('automatization', 'plans')" class="primary-tab-btn-inactive" title="Planos de Desligamento">
+                        <i data-lucide="cpu" class="w-5 h-5 mb-1"></i>
+                        <span class="text-[11px] tracking-tight">Auto</span>
+                    </button>
+
+                    <!-- Tab 3: Alertas -->
+                    <button id="primary-nav-alerts" onclick="switchMainView('alerts', 'rules')" class="primary-tab-btn-inactive" title="Central de Alertas & Notificações">
+                        <i data-lucide="bell" class="w-5 h-5 mb-1"></i>
+                        <span class="text-[11px] tracking-tight">Alertas</span>
+                    </button>
+
+                    <!-- Tab 4: Conexões & APIs -->
+                    <button id="primary-nav-conn" onclick="switchMainView('connections', 'nut')" class="primary-tab-btn-inactive" title="Conexões, APIs & Integrações">
+                        <i data-lucide="network" class="w-5 h-5 mb-1"></i>
+                        <span class="text-[11px] tracking-tight">APIs</span>
+                    </button>
+
+                </nav>
+            </div>
+
+            <!-- Bottom User Button -->
+            <div class="flex flex-col items-center gap-3">
+                <button onclick="openChangePasswordModal()" title="Utilizador: {{ current_user or 'admin' }}" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-slate-400 hover:text-white transition">
+                    <i data-lucide="user" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- 2. Secondary Submenu Column (Width: 190px) -->
+        <div class="w-48 sidebar-secondary border-r border-[#15202c] flex flex-col justify-between py-4 select-none relative z-10">
+            
+            <div class="space-y-3">
+                <!-- Section Title -->
+                <div class="px-4 pt-1 pb-1">
+                    <h2 id="submenu-header-title" class="text-xs font-black text-white uppercase tracking-wider">STATUS</h2>
+                </div>
+
+                <!-- Submenu Links List -->
+                <nav id="submenu-items-container" class="space-y-1">
+                    <!-- Gerado dinamicamente via JS -->
+                </nav>
+            </div>
+
+            <!-- Submenu Footer: Host Status -->
+            <div class="mx-3 p-2.5 rounded-xl bg-[#141e29] border border-white/5 text-[11px] font-mono text-slate-300 space-y-1">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 text-[10px]">NUT Host:</span>
+                    <span class="text-emerald-400 text-[10px] font-bold">● Online</span>
+                </div>
+                <div class="truncate text-slate-200 font-medium text-xs">10.255.255.28:3493</div>
+            </div>
+
+        </div>
+
+    </aside>
+
+    <!-- ========================================================================= -->
+    <!-- MAIN CONTENT AREA                                                         -->
+    <!-- ========================================================================= -->
+    <div class="flex-1 md:pl-[262px] flex flex-col min-h-screen">
+        
+        <!-- Top Navbar with Orange Border and Enging Logo -->
+        <header class="navbar-top-orange border-b border-slate-200 bg-white sticky top-0 z-30 px-4 lg:px-8 py-2.5 flex items-center justify-between gap-4 shadow-xs">
+            
+            <!-- Left: Mobile Toggle + Horizontal Enging Logo -->
+            <div class="flex items-center gap-4">
+                <button onclick="toggleSidebar(true)" class="md:hidden p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700">
+                    <i data-lucide="menu" class="w-5 h-5"></i>
+                </button>
+
+                <!-- Full Enging Logo on White Navbar -->
+                <div class="flex items-center gap-3">
+                    <img src="/static/img/logo-horizontal-transparent.png" alt="Dynamox ENGING" class="h-7 w-auto object-contain">
+                </div>
+            </div>
+
+            <!-- Right: Status Badge + Device Pill + User & Logout -->
+            <div class="flex items-center gap-3">
+                
+                <!-- Status Pill -->
+                <div id="status-pill" class="flex items-center gap-1.5 px-3 py-1 rounded-full border border-emerald-500/40 bg-emerald-50 text-emerald-700 text-xs font-bold">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="status-text">ONLINE</span>
+                </div>
+
+                <!-- Device Info Pill -->
+                <div class="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono">
+                    <span class="text-slate-800 font-bold">INVT HT1106XS</span>
+                    <span class="px-1.5 py-0.2 rounded bg-orange-100 text-enging-orange text-[10px] font-bold">v2.0</span>
+                </div>
+
+                <!-- Refresh Button -->
+                <button id="refresh-btn" onclick="fetchStatusNow(true)" title="Atualizar agora" class="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-enging-navy transition border border-slate-200">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                </button>
+
+                <div class="h-5 w-px bg-slate-200 mx-0.5"></div>
+
+                <!-- User & Logout -->
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-1.5 text-xs font-mono">
+                        <span class="text-slate-700 font-bold">{{ current_user or 'admin' }}</span>
+                        <span class="px-1.5 py-0.5 rounded bg-orange-100 text-enging-orange text-[10px] font-bold border border-orange-200">ADMIN</span>
+                    </div>
+
+                    <a href="/logout" title="Terminar Sessão" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition">
+                        Sair
+                    </a>
+                </div>
+
+            </div>
+        </header>
+
+        <!-- Breadcrumb Bar -->
+        <div class="px-4 lg:px-8 pt-4 pb-1 flex items-center justify-between text-xs text-slate-500 font-medium">
+            <div class="flex items-center gap-2">
+                <span id="breadcrumb-parent" class="text-slate-500 font-medium">Status</span>
+                <span class="text-slate-300">&gt;</span>
+                <span id="breadcrumb-current" class="text-slate-800 font-bold">Overview</span>
+            </div>
+            <div class="text-[11px] font-mono text-slate-400">
+                Última leitura: <span id="last-update" class="text-slate-600 font-semibold">--:--:--</span>
+            </div>
+        </div>
+
+        <!-- Main Body -->
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-5 space-y-6">
+
+            <!-- Active Alarm Banner -->
+            <div id="alarm-banner" class="hidden rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+                <div class="flex items-start gap-3.5">
+                    <div class="p-2 rounded-xl bg-amber-100 text-amber-700 border border-amber-200">
+                        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-sm font-bold text-amber-900">Aviso / Alarme Ativo no UPS</h3>
+                        <p id="alarm-message" class="text-xs text-amber-800 mt-0.5">Bypass Voltage Fail.</p>
+                    </div>
+                    <div class="text-xs font-mono text-amber-800 uppercase px-2.5 py-1 bg-amber-100 rounded-lg border border-amber-300 font-bold">
+                        Status: <span id="alarm-status-code">ALARM OL</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Global Active Plans Banner -->
+            <div id="active-plans-banner-container" class="space-y-2"></div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 1: STATUS -> OVERVIEW (VISÃO GERAL & FLUXO DE ENERGIA)               -->
+            <!-- ========================================================================= -->
+            <div id="view-status-overview" class="space-y-6">
+                
+                <!-- Power Flow Diagram -->
+                <section class="rounded-2xl border border-slate-200 bg-white p-5 lg:p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-enging-navy flex items-center gap-2">
+                            <i data-lucide="git-merge" class="w-4 h-4 text-enging-orange"></i>
+                            Fluxo de Energia em Tempo Real
+                        </h2>
+                        <span class="text-xs font-medium text-slate-500">Topologia: Dupla Conversão Online</span>
+                    </div>
+
+                    <div class="relative overflow-hidden rounded-xl bg-slate-50 border border-slate-200 p-4 sm:p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center relative z-10">
+                            
+                            <!-- 1. Grid Input -->
+                            <div id="flow-grid-box" class="flow-card p-4 rounded-xl border border-slate-200 bg-white text-center shadow-xs">
+                                <div class="w-10 h-10 mx-auto rounded-xl bg-slate-100 text-enging-navy flex items-center justify-center mb-2">
+                                    <i data-lucide="utility-pole" class="w-5 h-5"></i>
+                                </div>
+                                <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider">Rede Elétrica</h4>
+                                <div class="text-2xl font-black text-enging-navy mt-1 font-mono"><span id="flow-in-voltage">--.-</span> <span class="text-xs font-normal text-slate-500">V</span></div>
+                                <div class="text-xs text-slate-500 mt-0.5 font-medium"><span id="flow-in-freq">--.-</span> Hz • <span id="flow-in-current">-.-</span> A</div>
+                            </div>
+
+                            <!-- 2. Inverter / UPS -->
+                            <div id="flow-ups-box" class="flow-card p-4 rounded-xl border border-emerald-200 bg-white text-center shadow-xs">
+                                <div class="w-10 h-10 mx-auto rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
+                                    <i data-lucide="cpu" class="w-5 h-5"></i>
+                                </div>
+                                <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider">Inversor / UPS</h4>
+                                <div id="flow-mode-text" class="text-xs font-black text-emerald-600 mt-1 uppercase">Online (Dupla Conversão)</div>
+                                <div class="text-xs text-slate-500 mt-0.5">Rendimento FP: <strong id="flow-power-factor" class="text-slate-700 font-mono">0.90</strong></div>
+                            </div>
+
+                            <!-- 3. Battery Bank -->
+                            <div id="flow-batt-box" class="flow-card p-4 rounded-xl border border-blue-200 bg-white text-center shadow-xs">
+                                <div class="w-10 h-10 mx-auto rounded-xl bg-blue-50 text-enging-blue flex items-center justify-center mb-2">
+                                    <i data-lucide="battery-charging" class="w-5 h-5"></i>
+                                </div>
+                                <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider">Banco de Baterias</h4>
+                                <div class="text-2xl font-black text-enging-blue mt-1 font-mono"><span id="flow-batt-charge">--</span> <span class="text-xs font-normal text-slate-500">%</span></div>
+                                <div class="text-xs text-slate-500 mt-0.5 font-medium"><span id="flow-batt-volt">---.-</span> V • <span id="flow-batt-curr">-.-</span> A</div>
+                            </div>
+
+                            <!-- 4. Output Load -->
+                            <div id="flow-load-box" class="flow-card p-4 rounded-xl border border-orange-200 bg-white text-center shadow-xs">
+                                <div class="w-10 h-10 mx-auto rounded-xl bg-orange-50 text-enging-orange flex items-center justify-center mb-2">
+                                    <i data-lucide="server" class="w-5 h-5"></i>
+                                </div>
+                                <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider">Carga Conectada</h4>
+                                <div class="text-2xl font-black text-enging-orange mt-1 font-mono"><span id="flow-load-watts">---</span> <span class="text-xs font-normal text-slate-500">W</span></div>
+                                <div class="text-xs text-slate-500 mt-0.5 font-medium"><span id="flow-load-pct">--.-</span>% Load • <span id="flow-out-volt">---</span> V</div>
+                            </div>
+
+                        </div>
+
+                        <!-- Bypass Status Bar -->
+                        <div class="mt-4 pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between text-xs text-slate-500">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block" id="bypass-led"></span>
+                                <span>Circuito Bypass: <strong id="bypass-status-desc" class="text-slate-700 font-mono">0.0 V (Inativo)</strong></span>
+                            </div>
+                            <div>
+                                Driver: <span class="text-slate-700 font-medium">invt_modbus v2.8.1 (/dev/ups-usb)</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- KPI Cards Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    
+                    <!-- 1. Carga do UPS -->
+                    <div class="kpi-card p-5 rounded-2xl border border-slate-200 bg-white flex flex-col justify-between shadow-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Carga do Sistema</span>
+                            <span class="p-1.5 rounded-xl bg-orange-50 text-enging-orange border border-orange-200">
+                                <i data-lucide="gauge" class="w-4 h-4"></i>
+                            </span>
+                        </div>
+                        <div class="my-4 flex items-baseline justify-between">
+                            <div class="text-3xl font-black text-enging-navy font-mono tracking-tight" id="kpi-load-pct">--.-%</div>
+                            <div class="text-right">
+                                <div class="text-sm font-bold text-enging-orange font-mono" id="kpi-load-w">--- W</div>
+                                <div class="text-xs text-slate-400 font-mono" id="kpi-load-va">--- VA</div>
+                            </div>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div id="kpi-load-bar" class="bg-enging-orange h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <div class="text-xs text-slate-400 mt-2 flex justify-between font-medium">
+                            <span>0%</span>
+                            <span>Capacidade: 6000W</span>
+                            <span>100%</span>
+                        </div>
+                    </div>
+
+                    <!-- 2. Banco de Baterias -->
+                    <div class="kpi-card p-5 rounded-2xl border border-slate-200 bg-white flex flex-col justify-between shadow-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Banco de Baterias</span>
+                            <span class="p-1.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
+                                <i data-lucide="battery" class="w-4 h-4"></i>
+                            </span>
+                        </div>
+                        <div class="my-4 flex items-baseline justify-between">
+                            <div class="text-3xl font-black text-emerald-600 font-mono tracking-tight" id="kpi-batt-pct">--%</div>
+                            <div class="text-right">
+                                <div class="text-sm font-bold text-slate-700 font-mono" id="kpi-batt-volt">---.- V</div>
+                                <div class="text-xs text-slate-400 font-mono" id="kpi-batt-curr">-.-- A</div>
+                            </div>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div id="kpi-batt-bar" class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <div class="text-xs text-slate-400 mt-2 flex justify-between font-medium">
+                            <span>Estado: <strong class="text-slate-600">Flutuação</strong></span>
+                            <span>Nível DC</span>
+                        </div>
+                    </div>
+
+                    <!-- 3. Entrada AC -->
+                    <div class="kpi-card p-5 rounded-2xl border border-slate-200 bg-white flex flex-col justify-between shadow-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Entrada AC (Rede)</span>
+                            <span class="p-1.5 rounded-xl bg-slate-100 text-enging-navy border border-slate-200">
+                                <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
+                            </span>
+                        </div>
+                        <div class="my-4 flex items-baseline justify-between">
+                            <div class="text-3xl font-black text-enging-navy font-mono tracking-tight" id="kpi-in-volt">---.- V</div>
+                            <div class="text-right">
+                                <div class="text-sm font-bold text-slate-700 font-mono" id="kpi-in-freq">--.-- Hz</div>
+                                <div class="text-xs text-slate-400 font-mono" id="kpi-in-curr">-.-- A</div>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-slate-100 text-xs text-slate-500 flex justify-between font-medium">
+                            <span>Fator Potência: <strong class="text-slate-700 font-mono" id="kpi-in-pf">-.--</strong></span>
+                            <span>Fases: <strong class="text-slate-700">1 F</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- 4. Saída AC -->
+                    <div class="kpi-card p-5 rounded-2xl border border-slate-200 bg-white flex flex-col justify-between shadow-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Saída AC (Cargas)</span>
+                            <span class="p-1.5 rounded-xl bg-blue-50 text-enging-blue border border-blue-200">
+                                <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+                            </span>
+                        </div>
+                        <div class="my-4 flex items-baseline justify-between">
+                            <div class="text-3xl font-black text-enging-navy font-mono tracking-tight" id="kpi-out-volt">---.- V</div>
+                            <div class="text-right">
+                                <div class="text-sm font-bold text-enging-blue font-mono" id="kpi-out-freq">--.-- Hz</div>
+                                <div class="text-xs text-slate-400 font-mono" id="kpi-out-curr">-.-- A</div>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-slate-100 text-xs text-slate-500 flex justify-between font-medium">
+                            <span>Fator Potência: <strong class="text-slate-700 font-mono" id="kpi-out-pf">-.--</strong></span>
+                            <span>Fases: <strong class="text-slate-700">1 F</strong></span>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 2: STATUS -> TELEMETRIA (PÁGINA DEDICADA DE GRÁFICOS E MÉTRICAS)     -->
+            <!-- ========================================================================= -->
+            <div id="view-status-telemetry" class="hidden space-y-6">
+                
+                <!-- Section Header -->
+                <div class="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-orange-50 text-enging-orange border border-orange-200">
+                            <i data-lucide="activity" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-enging-navy tracking-tight">Telemetria & Gráficos Avançados em Tempo Real</h2>
+                            <p class="text-xs text-slate-500">Acompanhamento contínuo de potências, tensões elétricas, frequências e correntes.</p>
+                        </div>
+                    </div>
+                    <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 font-mono text-xs border border-slate-200">
+                        Resolução: 1.5s
+                    </span>
+                </div>
+
+                <!-- Real-Time Charts Section -->
+                <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="zap" class="w-4 h-4 text-enging-orange"></i>
+                                <h3 class="text-sm font-bold text-enging-navy">Potência Ativa (Watts) & Percentagem de Carga</h3>
+                            </div>
+                        </div>
+                        <div class="h-72 w-full">
+                            <canvas id="powerChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="trending-up" class="w-4 h-4 text-enging-blue"></i>
+                                <h3 class="text-sm font-bold text-enging-navy">Tensões AC: Entrada (Rede) vs Saída (UPS)</h3>
+                            </div>
+                        </div>
+                        <div class="h-72 w-full">
+                            <canvas id="voltageChart"></canvas>
+                        </div>
+                    </div>
+
+                </section>
+
+                <!-- Electrical Detailed Metrics Table Card -->
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-enging-navy flex items-center gap-2">
+                        <i data-lucide="cpu" class="w-4 h-4 text-enging-orange"></i>
+                        Parâmetros Elétricos & Diagnóstico Detalhado
+                    </h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+                        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                            <div class="text-slate-400 font-sans font-bold uppercase text-[10px]">Circuito de Entrada</div>
+                            <div class="flex justify-between"><span>Tensão RMS:</span><strong id="telem-in-volt" class="text-slate-800">---.- V</strong></div>
+                            <div class="flex justify-between"><span>Frequência:</span><strong id="telem-in-freq" class="text-slate-800">--.-- Hz</strong></div>
+                            <div class="flex justify-between"><span>Corrente:</span><strong id="telem-in-curr" class="text-slate-800">-.-- A</strong></div>
+                            <div class="flex justify-between"><span>Fator Potência:</span><strong id="telem-in-pf" class="text-slate-800">-.--</strong></div>
+                        </div>
+
+                        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                            <div class="text-slate-400 font-sans font-bold uppercase text-[10px]">Circuito de Saída</div>
+                            <div class="flex justify-between"><span>Tensão RMS:</span><strong id="telem-out-volt" class="text-slate-800">---.- V</strong></div>
+                            <div class="flex justify-between"><span>Frequência:</span><strong id="telem-out-freq" class="text-slate-800">--.-- Hz</strong></div>
+                            <div class="flex justify-between"><span>Potência Real (W):</span><strong id="telem-out-w" class="text-enging-orange">--- W</strong></div>
+                            <div class="flex justify-between"><span>Potência Aparente (VA):</span><strong id="telem-out-va" class="text-slate-800">--- VA</strong></div>
+                        </div>
+
+                        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                            <div class="text-slate-400 font-sans font-bold uppercase text-[10px]">Banco DC & Inversor</div>
+                            <div class="flex justify-between"><span>Carga Bateria:</span><strong id="telem-batt-pct" class="text-emerald-600">-- %</strong></div>
+                            <div class="flex justify-between"><span>Tensão DC:</span><strong id="telem-batt-volt" class="text-slate-800">---.- V</strong></div>
+                            <div class="flex justify-between"><span>Corrente DC:</span><strong id="telem-batt-curr" class="text-slate-800">-.-- A</strong></div>
+                            <div class="flex justify-between"><span>Circuito Bypass:</span><strong id="telem-bypass-volt" class="text-slate-800">-.-- V</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 3: STATUS -> VARIÁVEIS NUT (PÁGINA DEDICADA COMPLETA)                -->
+            <!-- ========================================================================= -->
+            <div id="view-status-vars" class="hidden space-y-6">
+                
+                <!-- Section Header -->
+                <div class="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-slate-100 text-enging-navy border border-slate-200">
+                            <i data-lucide="terminal" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-enging-navy tracking-tight">Explorador Completo de Variáveis do NUT</h2>
+                            <p class="text-xs text-slate-500">Inspecione todas as chaves e valores transmitidos pelo driver invt_modbus.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="copyRawVarsJson()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5 border border-slate-200">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copiar JSON
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filter and Search Bar -->
+                <div class="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-2 flex-1 max-w-md">
+                            <input type="text" id="var-search" oninput="filterRawVars()" placeholder="Pesquisar por variável ou valor (ex: voltage, battery, input)..." class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-enging-orange">
+                        </div>
+                        
+                        <!-- Category Filter Buttons -->
+                        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                            <button onclick="setVarCategoryFilter('all')" class="var-filter-btn px-3 py-1.5 rounded-lg bg-enging-orange text-white font-bold transition">Todos</button>
+                            <button onclick="setVarCategoryFilter('battery')" class="var-filter-btn px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium transition">Bateria</button>
+                            <button onclick="setVarCategoryFilter('input')" class="var-filter-btn px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium transition">Entrada</button>
+                            <button onclick="setVarCategoryFilter('output')" class="var-filter-btn px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium transition">Saída</button>
+                            <button onclick="setVarCategoryFilter('ups')" class="var-filter-btn px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium transition">UPS</button>
+                            <button onclick="setVarCategoryFilter('device')" class="var-filter-btn px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium transition">Dispositivo</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Full Variables Table -->
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                                <tr>
+                                    <th class="p-3.5 font-bold text-enging-navy">Chave (NUT Variable)</th>
+                                    <th class="p-3.5 font-bold text-enging-navy">Valor Atual</th>
+                                    <th class="p-3.5 font-bold text-enging-navy text-right">Categoria</th>
+                                </tr>
+                            </thead>
+                            <tbody id="raw-vars-tbody" class="divide-y divide-slate-100 text-slate-700 bg-white">
+                                <!-- Preenchido dinamicamente via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 4: AUTOMATIZATION (LINGUETAS / TABS MULTI-PLANO)                     -->
+            <!-- ========================================================================= -->
+            <div id="view-automatization" class="hidden space-y-6">
+                
+                <!-- Section Header -->
+                <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-orange-50 text-enging-orange border border-orange-200">
+                            <i data-lucide="cpu" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-enging-navy tracking-tight">Orquestrador de Desligamento em Estágios</h2>
+                            <p class="text-xs text-slate-500">Configure cada estágio em linguetas separadas para desligar VMs e nós sequencialmente.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <button onclick="openCreatePlanModal()" class="px-4 py-2.5 rounded-xl bg-enging-orange hover:bg-enging-orange-hover text-white font-bold text-xs shadow-md shadow-enging-orange/20 transition flex items-center gap-1.5">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i> Criar Novo Plano
+                        </button>
+                        <button onclick="openLogsModal()" class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-enging-navy border border-slate-200 font-bold text-xs transition flex items-center gap-1.5">
+                            <i data-lucide="list" class="w-4 h-4 text-enging-orange"></i> Histórico Geral
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Plan Tabs (Linguetas Horizontais) -->
+                <div class="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200" id="plan-tabs-bar">
+                    <!-- Inserido dinamicamente via JS -->
+                </div>
+
+                <!-- Active Plan Content Card -->
+                <div id="active-plan-panel-container">
+                    <!-- Inserido dinamicamente via JS -->
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 5: ALERTAS -> REGRAS DE ALERTA (PÁGINA DEDICADA)                     -->
+            <!-- ========================================================================= -->
+            <div id="view-alerts-rules" class="hidden space-y-6">
+                
+                <!-- Section Header -->
+                <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-orange-50 text-enging-orange border border-orange-200">
+                            <i data-lucide="sliders" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-enging-navy tracking-tight">Regras & Gatilhos de Alertas</h2>
+                            <p class="text-xs text-slate-500">Configure os disparos automáticos para falta de energia, acionamento de bateria, sobrecargas e alarmes da UPS.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <button onclick="openCreateAlertRuleModal()" class="px-4 py-2.5 rounded-xl bg-enging-orange hover:bg-enging-orange-hover text-white font-bold text-xs shadow-md shadow-enging-orange/20 transition flex items-center gap-1.5">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i> Criar Nova Regra
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Rules List Grid -->
+                <div id="alert-rules-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Carregado via JS -->
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 6: ALERTAS -> CONTATOS & CANAIS (PÁGINA DEDICADA)                    -->
+            <!-- ========================================================================= -->
+            <div id="view-alerts-contacts" class="hidden space-y-6">
+                
+                <!-- Section Header -->
+                <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-blue-50 text-enging-blue border border-blue-200">
+                            <i data-lucide="users" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-enging-navy tracking-tight">Contatos & Configuração de Canais</h2>
+                            <p class="text-xs text-slate-500">Cadastre destinatários (WhatsApp, Email, SMS, Webhooks) e configure os gateways de envio.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <button onclick="openAddRecipientModal()" class="px-4 py-2.5 rounded-xl bg-enging-orange hover:bg-enging-orange-hover text-white font-bold text-xs shadow-md shadow-enging-orange/20 transition flex items-center gap-1.5">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i> Cadastrar Novo Contato
+                        </button>
+                        <button onclick="openChannelSettingsModal()" class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-enging-navy border border-slate-200 font-bold text-xs transition flex items-center gap-1.5">
+                            <i data-lucide="settings" class="w-4 h-4 text-enging-orange"></i> Configurar Gateways (SMTP / WhatsApp / SMS)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- WhatsApp Web Status Card -->
+                <div class="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
+                            <i data-lucide="phone-call" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold text-slate-800">Conexão WhatsApp Web:</span>
+                                <span id="wa-contacts-status-badge" class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-300 text-[10px] font-bold font-mono">A verificar...</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-0.5">Autentique sua conta via QR Code em Gateways para disparar mensagens diretamente aos contatos.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="switchMainView('connections', 'gateways')" class="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200 transition flex items-center gap-1.5">
+                            <i data-lucide="qr-code" class="w-3.5 h-3.5"></i> Ver / Ler QR Code
+                        </button>
+                        <button onclick="testWhatsAppDirect()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200 transition flex items-center gap-1.5">
+                            <i data-lucide="send" class="w-3.5 h-3.5"></i> Testar Envio
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Contacts Table Card -->
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase tracking-wider text-[11px] font-bold">
+                                <tr>
+                                    <th class="p-3.5 text-enging-navy">Nome do Contato</th>
+                                    <th class="p-3.5 text-enging-navy">Email (SMTP)</th>
+                                    <th class="p-3.5 text-enging-navy">WhatsApp</th>
+                                    <th class="p-3.5 text-enging-navy">SMS</th>
+                                    <th class="p-3.5 text-enging-navy">Webhook URL</th>
+                                    <th class="p-3.5 text-enging-navy">Status</th>
+                                    <th class="p-3.5 text-right text-enging-navy">Ações de Teste & Edição</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alert-contacts-tbody" class="divide-y divide-slate-100 bg-white">
+                                <!-- Carregado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 7: ALERTAS -> HISTÓRICO DE ENVIOS (PÁGINA DEDICADA)                  -->
+            <!-- ========================================================================= -->
+            <div id="view-alerts-logs" class="hidden space-y-6">
+                
+                <!-- Section Header -->
+                <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-purple-50 text-purple-700 border border-purple-200">
+                            <i data-lucide="history" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-enging-navy tracking-tight">Histórico de Envios & Auditoria de Alertas</h2>
+                            <p class="text-xs text-slate-500">Registo completo de todas as mensagens e notificações transmitidas aos destinatários.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="loadAlertsData()" class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5 border border-slate-200">
+                            <i data-lucide="refresh-cw" class="w-4 h-4 text-enging-orange"></i> Atualizar Histórico
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Logs List Card -->
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-3">
+                    <div id="alert-logs-list" class="space-y-2 max-h-[600px] overflow-y-auto">
+                        <!-- Carregado via JS -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 8: CONEXÕES -> SERVIDOR NUT (PÁGINA DEDICADA)                        -->
+            <!-- ========================================================================= -->
+            <div id="view-conn-nut" class="hidden space-y-6">
+                
+                <!-- Section Header -->
+                <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-orange-50 text-enging-orange border border-orange-200">
+                            <i data-lucide="server" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-enging-navy tracking-tight">Servidor NUT (Network UPS Tools)</h2>
+                            <p class="text-xs text-slate-500">Configuração do socket daemon `upsd`, credenciais de comunicação e parâmetros de polling.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="testNutConnectionLive()" class="px-3.5 py-2.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-enging-orange font-bold text-xs transition flex items-center gap-1.5 border border-orange-200">
+                            <i data-lucide="activity" class="w-4 h-4"></i> Testar Socket Agora
+                        </button>
+                    </div>
+                </div>
+
+                <!-- NUT Settings Form Card -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <div class="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
+                        <h3 class="text-sm font-bold text-enging-navy flex items-center gap-2 border-b border-slate-100 pb-3">
+                            <i data-lucide="sliders" class="w-4 h-4 text-enging-orange"></i> Parâmetros de Ligação Socket NUT
+                        </h3>
+
+                        <form id="form-nut-config" onsubmit="saveNutConfig(event)" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Host / IP do Servidor NUT</label>
+                                    <input type="text" id="nut-conf-host" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-enging-orange focus:outline-none" placeholder="10.255.255.28" required>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Porta do Socket (Padrão 3493)</label>
+                                    <input type="number" id="nut-conf-port" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-enging-orange focus:outline-none" value="3493" required>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Nome do Dispositivo UPS</label>
+                                    <input type="text" id="nut-conf-upsname" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-enging-orange focus:outline-none" value="ups" required>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Utilizador NUT (upsd.users)</label>
+                                    <input type="text" id="nut-conf-user" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-enging-orange focus:outline-none" placeholder="enging">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Senha NUT</label>
+                                    <input type="password" id="nut-conf-pass" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-enging-orange focus:outline-none" placeholder="••••••••">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Intervalo de Polling (segundos)</label>
+                                    <input type="number" step="0.5" id="nut-conf-poll" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-enging-orange focus:outline-none" value="2.0" required>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Timeout de Socket (segundos)</label>
+                                    <input type="number" step="1" id="nut-conf-timeout" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-enging-orange focus:outline-none" value="5.0" required>
+                                </div>
+                            </div>
+
+                            <div class="pt-3 flex justify-end">
+                                <button type="submit" class="px-5 py-2.5 rounded-xl bg-enging-orange hover:bg-enging-orange-hover text-white font-bold text-xs transition shadow-sm flex items-center gap-2">
+                                    <i data-lucide="save" class="w-4 h-4"></i> Guardar Alterações NUT
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Diagnostic & Live Status -->
+                    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between space-y-4">
+                        <div class="space-y-4">
+                            <h3 class="text-sm font-bold text-enging-navy flex items-center gap-2 border-b border-slate-100 pb-3">
+                                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i> Diagnóstico de Ligação
+                            </h3>
+
+                            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs font-mono">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Status Socket:</span>
+                                    <span id="nut-diag-status" class="font-bold text-emerald-600">● Conectado (Online)</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Última Checagem:</span>
+                                    <span id="nut-diag-lastcheck" class="text-slate-700">--:--:--</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Driver Ativo:</span>
+                                    <span class="text-slate-700 font-bold">invt_modbus v2.8.1</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Porta Serial/USB:</span>
+                                    <span class="text-slate-700">/dev/ups-usb</span>
+                                </div>
+                            </div>
+
+                            <div id="nut-test-result-box" class="hidden p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 space-y-1">
+                                <p id="nut-test-result-msg" class="font-semibold"></p>
+                                <p id="nut-test-result-sub" class="text-[11px] font-mono opacity-80"></p>
+                            </div>
+                        </div>
+
+                        <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-800 flex items-start gap-2">
+                            <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+                            <span>O serviço `nut-server` corre nativamente no Ubuntu 24.04 (`emsups01`) e atende requisições na porta 3493.</span>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 9: CONEXÕES -> PROXMOX VE SSH (PÁGINA DEDICADA)                      -->
+            <!-- ========================================================================= -->
+            <div id="view-conn-proxmox" class="hidden space-y-6">
+                
+                <!-- Section Header -->
+                <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-orange-50 text-enging-orange border border-orange-200">
+                            <i data-lucide="cpu" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-enging-navy tracking-tight">Servidores & Nós Proxmox VE (SSH)</h2>
+                            <p class="text-xs text-slate-500">Gestão de nós e clusters Proxmox VE para orquestração e desligamento gracioso de VMs / Containers via SSH.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="openProxmoxModal()" class="px-3.5 py-2.5 rounded-xl bg-enging-orange hover:bg-enging-orange-hover text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm">
+                            <i data-lucide="plus" class="w-4 h-4"></i> + Adicionar Nó Proxmox (SSH)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Proxmox Nodes Table Card -->
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase tracking-wider text-[11px] font-bold">
+                                <tr>
+                                    <th class="p-3.5 text-enging-navy">Nome do Host / Nó</th>
+                                    <th class="p-3.5 text-enging-navy">Host / IP (Porta)</th>
+                                    <th class="p-3.5 text-enging-navy">Método de Ligação</th>
+                                    <th class="p-3.5 text-enging-navy">Autenticação</th>
+                                    <th class="p-3.5 text-enging-navy">Utilizador</th>
+                                    <th class="p-3.5 text-enging-navy">Status</th>
+                                    <th class="p-3.5 text-right text-enging-navy">Ações de Teste & Gestão</th>
+                                </tr>
+                            </thead>
+                            <tbody id="proxmox-tbody" class="divide-y divide-slate-100 bg-white">
+                                <!-- Carregado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 10: CONEXÕES -> VMWARE ESXI / VCENTER (PÁGINA DEDICADA)              -->
+            <!-- ========================================================================= -->
+            <div id="view-conn-vmware" class="hidden space-y-6">
+                
+                <!-- Section Header -->
+                <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-blue-50 text-blue-700 border border-blue-200">
+                            <i data-lucide="box" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-enging-navy tracking-tight">Servidores VMware ESXi & vCenter</h2>
+                            <p class="text-xs text-slate-500">Conexões para automação de hosts VMware via REST API ou SSH dedicado.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="openVmwareModal()" class="px-3.5 py-2.5 rounded-xl bg-enging-orange hover:bg-enging-orange-hover text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm">
+                            <i data-lucide="plus" class="w-4 h-4"></i> + Adicionar Host VMware
+                        </button>
+                    </div>
+                </div>
+
+                <!-- VMware Nodes Table Card -->
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase tracking-wider text-[11px] font-bold">
+                                <tr>
+                                    <th class="p-3.5 text-enging-navy">Nome do Servidor</th>
+                                    <th class="p-3.5 text-enging-navy">Host / IP</th>
+                                    <th class="p-3.5 text-enging-navy">Tipo</th>
+                                    <th class="p-3.5 text-enging-navy">Método de Ligação</th>
+                                    <th class="p-3.5 text-enging-navy">Utilizador</th>
+                                    <th class="p-3.5 text-enging-navy">Status</th>
+                                    <th class="p-3.5 text-right text-enging-navy">Ações de Teste & Gestão</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vmware-tbody" class="divide-y divide-slate-100 bg-white">
+                                <!-- Carregado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 11: CONEXÕES -> GATEWAYS DE MENSAGENS (PÁGINA DEDICADA)              -->
+            <!-- ========================================================================= -->
+            <div id="view-conn-gateways" class="hidden space-y-6">
+                
+                <!-- Section Header -->
+                <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <i data-lucide="send" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-enging-navy tracking-tight">Gateways de Mensagens & APIs de Notificação</h2>
+                            <p class="text-xs text-slate-500">Gestão centralizada dos canais de transmissão. Clique em <strong>Editar</strong> para configurar os parâmetros ou emparelhar o QR Code em uma modal dedicada.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="refreshWhatsAppStatus(true); renderGatewaysList();" class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5 border border-slate-200 shadow-xs">
+                            <i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-600"></i> Atualizar Status
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Gateways Table Card -->
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase tracking-wider text-[11px] font-bold">
+                                <tr>
+                                    <th class="p-3.5 text-enging-navy">Canal / Gateway</th>
+                                    <th class="p-3.5 text-enging-navy">Tipo / Provedor</th>
+                                    <th class="p-3.5 text-enging-navy">Destino / Endpoint Configurado</th>
+                                    <th class="p-3.5 text-enging-navy">Status Operacional</th>
+                                    <th class="p-3.5 text-right text-enging-navy">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gateways-tbody" class="divide-y divide-slate-100 bg-white">
+                                <!-- Carregado dinamicamente via JS (renderGatewaysList) -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 12: CONEXÕES -> TOKENS DE API & WEBHOOKS (PÁGINA DEDICADA)           -->
+            <!-- ========================================================================= -->
+            <div id="view-conn-tokens" class="hidden space-y-6">
+                
+                <!-- Section Header -->
+                <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-2xl bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            <i data-lucide="key" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-enging-navy tracking-tight">Chaves de API & Documentação de Integração</h2>
+                            <p class="text-xs text-slate-500">Geração de tokens Bearer para acesso REST externo (Zabbix, Grafana, Home Assistant, scripts Python).</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="openCreateTokenModal()" class="px-3.5 py-2.5 rounded-xl bg-enging-orange hover:bg-enging-orange-hover text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm">
+                            <i data-lucide="plus" class="w-4 h-4"></i> + Gerar Nova Chave de API
+                        </button>
+                    </div>
+                </div>
+
+                <!-- API Keys Table Card -->
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase tracking-wider text-[11px] font-bold">
+                                <tr>
+                                    <th class="p-3.5 text-enging-navy">Nome / Aplicação</th>
+                                    <th class="p-3.5 text-enging-navy">Chave de API (Bearer Token)</th>
+                                    <th class="p-3.5 text-enging-navy">Nível de Permissão</th>
+                                    <th class="p-3.5 text-enging-navy">Criado em</th>
+                                    <th class="p-3.5 text-enging-navy">Último Uso</th>
+                                    <th class="p-3.5 text-right text-enging-navy">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="api-tokens-tbody" class="divide-y divide-slate-100 bg-white">
+                                <!-- Carregado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Interactive Integration Examples Card -->
+                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+                    <h3 class="text-sm font-bold text-enging-navy flex items-center gap-2 border-b border-slate-100 pb-3">
+                        <i data-lucide="code" class="w-4 h-4 text-enging-orange"></i> Exemplos Rápidos de Integração via API REST Externa
+                    </h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- cURL Example -->
+                        <div class="p-4 rounded-xl bg-slate-900 text-slate-200 font-mono text-xs space-y-2">
+                            <div class="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-2">
+                                <span class="font-bold text-white flex items-center gap-1.5"><i data-lucide="terminal" class="w-3.5 h-3.5 text-enging-orange"></i> Chamada cURL (Bash)</span>
+                                <button onclick="copySnippet('curl-snippet')" class="text-[11px] hover:text-white flex items-center gap-1 text-slate-400">
+                                    <i data-lucide="copy" class="w-3 h-3"></i> Copiar
+                                </button>
+                            </div>
+                            <pre id="curl-snippet" class="overflow-x-auto text-[11px] leading-relaxed text-emerald-400">curl -k -H "Authorization: Bearer eng_live_SEU_TOKEN" \
+     https://10.255.255.28/api/v1/status</pre>
+                        </div>
+
+                        <!-- Python Example -->
+                        <div class="p-4 rounded-xl bg-slate-900 text-slate-200 font-mono text-xs space-y-2">
+                            <div class="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-2">
+                                <span class="font-bold text-white flex items-center gap-1.5"><i data-lucide="file-code" class="w-3.5 h-3.5 text-blue-400"></i> Python 3 (requests)</span>
+                                <button onclick="copySnippet('py-snippet')" class="text-[11px] hover:text-white flex items-center gap-1 text-slate-400">
+                                    <i data-lucide="copy" class="w-3 h-3"></i> Copiar
+                                </button>
+                            </div>
+                            <pre id="py-snippet" class="overflow-x-auto text-[11px] leading-relaxed text-sky-300">import requests
+r = requests.get('https://10.255.255.28/api/v1/status', 
+                 headers={'Authorization': 'Bearer eng_live_...'}, verify=False)
+data = r.json()
+print("Carga:", data['data']['output']['load_pct'], "%")</pre>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="border-t border-slate-200 bg-white py-4 px-4 text-center text-xs text-slate-400 mt-auto">
+            <p>Enging UPS System • <span class="text-slate-600 font-mono font-medium">INVT HT1106XS</span> • Servidor <span class="text-slate-600 font-mono font-medium">10.255.255.28</span></p>
+        </footer>
+
+    </div>
+
+    <!-- App Scripts -->
+    <script src="/static/js/app.js?v=3.3"></script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+{
+  "plans": [
+    {
+      "id": "87f509bd-70d2-4cbb-a521-810bd98dc381",
+      "name": "Estágio 1 - VMs Não-Críticas / Dev (60%)",
+      "description": "Desliga máquinas virtuais de desenvolvimento e testes no Proxmox quando a bateria atingir 60%",
+      "enabled": true,
+      "trigger_battery_pct": 60.0,
+      "require_on_battery": true,
+      "grace_period_sec": 10,
+      "state": {
+        "status": "idle",
+        "countdown_remaining": 0,
+        "triggered_at": null,
+        "current_server": null,
+        "results": []
+      },
+      "servers": [
+        {
+          "id": "8df8f35e-d769-4f05-9183-d4906f89b4a7",
+          "name": "Proxmox - VMs Dev (qm shutdown)",
+          "host": "10.255.255.10",
+          "port": 22,
+          "method": "ssh",
+          "username": "root",
+          "password": "",
+          "sudo": false,
+          "custom_command": "for vmid in 101 102 103 104 105 106 107 108; do qm shutdown $vmid & done; wait",
+          "delay_sec": 0,
+          "enabled": true,
+          "last_test": null
+        }
+      ]
+    },
+    {
+      "id": "272b96b0-cb5a-4091-a5f2-13db8660464b",
+      "name": "Estágio 2 - Servidores Críticos & Hosts (15%)",
+      "description": "Desliga nós de virtualização VMware, Proxmox e Storages quando a bateria atingir 15%",
+      "enabled": true,
+      "trigger_battery_pct": 15.0,
+      "require_on_battery": true,
+      "grace_period_sec": 15,
+      "state": {
+        "status": "idle",
+        "countdown_remaining": 0,
+        "triggered_at": null,
+        "current_server": null,
+        "results": []
+      },
+      "servers": [
+        {
+          "id": "1b87145f-a27e-4b89-b834-5b32a6c9f671",
+          "name": "Host Proxmox Cluster Node 1",
+          "host": "10.255.255.10",
+          "port": 22,
+          "method": "ssh",
+          "username": "root",
+          "password": "",
+          "sudo": false,
+          "custom_command": "shutdown -h now",
+          "delay_sec": 0,
+          "enabled": true,
+          "last_test": null
+        },
+        {
+          "id": "e84f9c01-8def-4964-9870-42b8eb29d75d",
+          "name": "Host VMware ESXi Node 2",
+          "host": "10.255.255.20",
+          "port": 22,
+          "method": "ssh",
+          "username": "root",
+          "password": "",
+          "sudo": false,
+          "custom_command": "esxcli system shutdown poweroff -d 10 -r 'UPS Low Battery'",
+          "delay_sec": 30,
+          "enabled": true,
+          "last_test": null
+        }
+      ]
+    },
+    {
+      "id": "3482344d-b2eb-4dd4-af84-d82bff85c49a",
+      "name": "Estágio 3 - Servidor Local da UPS (5%)",
+      "description": "Desligamento final do próprio servidor NUT quando a bateria atingir 5%",
+      "enabled": true,
+      "trigger_battery_pct": 5.0,
+      "require_on_battery": true,
+      "grace_period_sec": 5,
+      "state": {
+        "status": "idle",
+        "countdown_remaining": 0,
+        "triggered_at": null,
+        "current_server": null,
+        "results": []
+      },
+      "servers": [
+        {
+          "id": "d2d73ae0-3886-4c21-8737-4b23710eefeb",
+          "name": "Servidor Local NUT (10.255.255.28)",
+          "host": "127.0.0.1",
+          "port": 22,
+          "method": "local_command",
+          "username": "root",
+          "password": "",
+          "sudo": true,
+          "custom_command": "shutdown -h now",
+          "delay_sec": 0,
+          "enabled": true,
+          "last_test": null
+        }
+      ]
+    }
+  ],
+  "logs": []
+}

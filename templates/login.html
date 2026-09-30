@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Enging UPS System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        enging: {
+                            navy: '#223546',
+                            'navy-dark': '#192836',
+                            'navy-light': '#2c4358',
+                            orange: '#e95c0c',
+                            'orange-hover': '#d04f08',
+                            'orange-light': '#fff3ed',
+                            blue: '#184e8e'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex items-center justify-center p-4 font-sans selection:bg-enging-orange selection:text-white relative overflow-hidden">
+
+    <!-- Background subtle geometric accents -->
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-enging-navy/5 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-enging-orange/10 rounded-full blur-3xl pointer-events-none"></div>
+
+    <!-- Decorative Top Line Bar with Brand Colors -->
+    <div class="fixed top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-enging-navy via-enging-navy to-enging-orange"></div>
+
+    <div class="w-full max-w-md relative z-10">
+        
+        <!-- Login Card -->
+        <div class="rounded-3xl border border-slate-200 bg-white/95 backdrop-blur-xl p-8 sm:p-10 shadow-xl shadow-slate-300/60 relative">
+            
+            <!-- Branding Header (Vertical Logo) -->
+            <div class="text-center mb-8">
+                <div class="inline-block p-4 rounded-2xl bg-white shadow-sm border border-slate-100 mb-4">
+                    <img src="/static/img/logo-vertical-transparent.png" alt="Enging Logo" class="h-20 w-auto mx-auto object-contain">
+                </div>
+                <h1 class="text-2xl font-black text-enging-navy tracking-tight">Enging UPS System</h1>
+                <p class="text-xs text-slate-500 mt-1 font-medium">Monitorização e Automação de Energia</p>
+                <div class="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full bg-slate-50 text-[11px] text-slate-600 font-mono border border-slate-200">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>INVT HT1106XS • 10.255.255.28</span>
+                </div>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+                
+                <div>
+                    <label for="username" class="block text-xs font-bold text-enging-navy uppercase tracking-wider mb-1.5">Utilizador</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="user" class="w-4 h-4"></i>
+                        </div>
+                        <input type="text" id="username" name="username" required autofocus placeholder="admin" class="w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-enging-orange focus:ring-2 focus:ring-enging-orange/20 transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-xs font-bold text-enging-navy uppercase tracking-wider mb-1.5">Senha</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="lock" class="w-4 h-4"></i>
+                        </div>
+                        <input type="password" id="password" name="password" required placeholder="••••••••" class="w-full pl-10 pr-10 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-enging-orange focus:ring-2 focus:ring-enging-orange/20 transition">
+                        <button type="button" onclick="togglePassVisibility()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600">
+                            <i id="pass-eye-icon" data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" id="btn-submit" class="w-full py-3 px-4 rounded-xl bg-enging-orange hover:bg-enging-orange-hover text-white font-bold text-sm shadow-lg shadow-enging-orange/25 transition duration-150 flex items-center justify-center gap-2">
+                        <span id="btn-text">Entrar no Sistema</span>
+                        <i id="btn-icon" data-lucide="log-in" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+            </form>
+
+            <div class="mt-8 pt-4 border-t border-slate-100 text-center text-xs text-slate-400">
+                <span>Acesso Seguro • <strong class="text-enging-navy font-mono">Enging UPS</strong></span>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        const swalLight = Swal.mixin({
+            background: '#ffffff',
+            color: '#1e293b',
+            confirmButtonColor: '#e95c0c',
+            cancelButtonColor: '#64748b',
+            customClass: {
+                popup: 'rounded-2xl shadow-2xl border border-slate-200',
+                title: 'text-slate-900 font-bold',
+                htmlContainer: 'text-slate-600 text-sm'
+            }
+        });
+
+        function togglePassVisibility() {
+            const passInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('pass-eye-icon');
+            if (passInput.type === 'password') {
+                passInput.type = 'text';
+                eyeIcon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                passInput.type = 'password';
+                eyeIcon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons();
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btnSubmit = document.getElementById('btn-submit');
+            const btnText = document.getElementById('btn-text');
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            btnSubmit.disabled = true;
+            btnText.innerText = 'A verificar credenciais...';
+
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    swalLight.fire({
+                        icon: 'success',
+                        title: 'Autenticado com Sucesso!',
+                        text: 'A redirecionar para o painel...',
+                        timer: 1000,
+                        showConfirmButton: false
+                    });
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 800);
+                } else {
+                    swalLight.fire({
+                        icon: 'error',
+                        title: 'Falha na Autenticação',
+                        text: data.message || 'Utilizador ou senha incorretos.'
+                    });
+                    btnSubmit.disabled = false;
+                    btnText.innerText = 'Entrar no Sistema';
+                }
+            } catch (err) {
+                swalLight.fire({
+                    icon: 'error',
+                    title: 'Erro de Comunicação',
+                    text: 'Não foi possível contactar o servidor.'
+                });
+                btnSubmit.disabled = false;
+                btnText.innerText = 'Entrar no Sistema';
+            }
+        }
+    </script>
+</body>
+</html>
