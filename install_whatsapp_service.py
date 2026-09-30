@@ -7,7 +7,7 @@ sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 SERVER = "10.255.255.28"
 USER = "enging"
-PASS = "enging!pt"
+PASS = "password123"
 REMOTE_DIR = "/opt/nut-dashboard/whatsapp_service"
 
 def run_sudo(ssh, cmd):
@@ -65,7 +65,7 @@ def setup():
     # 5. Configurar systemd service
     print("\n--- 5. Configurando serviço systemd (nut-whatsapp.service) ---")
     service_content = """[Unit]
-Description=Enging UPS WhatsApp Web Microservice (Baileys)
+Description=NUT Panel WhatsApp Web Microservice (Baileys)
 After=network.target
 
 [Service]

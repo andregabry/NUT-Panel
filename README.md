@@ -1,206 +1,201 @@
-# ⚡ Enging UPS Management & Automation System
+# ⚡ NUT Panel - UPS Management & Automation System
 
 <div align="center">
-  <img src="static/img/logo-horizontal.png" alt="Enging Logo" width="300" />
-  <p><strong>Plataforma Centralizada de Monitorização em Tempo Real, Automação de Infraestrutura e Gestão de Alertas para UPS Industriais</strong></p>
-  <p><em>Desenvolvido para UPS <strong>INVT HT1106XS (6kVA / 6kW Online Double Conversion)</strong> & Integração Multi-Nó (Proxmox VE via SSH & VMware ESXi)</em></p>
+  <h3><strong>Modern, Real-Time UPS Monitoring, Infrastructure Automation & Multi-Channel Alert Gateway</strong></h3>
+  <p><em>Built on <strong>Network UPS Tools (NUT)</strong> • Real-Time SSE Synoptic Power Flow • Proxmox VE (SSH CLI) & VMware ESXi Graceful Shutdown • WhatsApp (Baileys MD), Microsoft Teams, Google Chat, SMS & SMTP Alerts</em></p>
 </div>
 
 ---
 
-## 📋 Índice
+## 📋 Table of Contents
 
-1. [Visão Geral](#-visão-geral)
-2. [Arquitetura do Sistema](#-arquitetura-do-sistema)
-3. [Funcionalidades Principais](#-funcionalidades-principais)
-   - [Diagrama Sinóptico de Fluxo de Energia](#1-diagrama-sinóptico-de-fluxo-de-energia)
-   - [Orquestrador de Desligamento Automatizado (Graceful Shutdown)](#2-orquestrador-de-desligamento-automatizado-graceful-shutdown)
-   - [Central Multicanal de Alertas & Notificações](#3-central-multicanal-de-alertas--notificações)
-   - [API RESTful v1 Integrada](#4-api-restful-v1-integrada)
-4. [Módulos & Microsserviços](#-módulos--microsserviços)
-5. [Instalação & Configuração em Produção](#-instalação--configuração-em-produção)
-   - [Pré-requisitos do Sistema](#pré-requisitos)
-   - [Configuração do Serviço Web (Python/Flask)](#configuração-do-serviço-web-pythonflask)
-   - [Configuração do Microsserviço WhatsApp (Baileys MD)](#configuração-do-microsserviço-whatsapp-baileys-md)
-   - [Configuração dos Serviços Systemd](#configuração-dos-serviços-systemd)
-6. [Configurações de Rede & Rotas Estáticas](#-configurações-de-rede--rotas-estáticas)
-7. [Referência da API REST](#-referência-da-api-rest)
-8. [Estrutura de Ficheiros do Projeto](#-estrutura-de-ficheiros-do-projeto)
-9. [Licença e Créditos](#-licença-e-créditos)
-
----
-
-## 🌟 Visão Geral
-
-O **Enging UPS Management & Automation System** é uma solução corporativa para monitorização em tempo real, automação e orquestração de emergência para sistemas de alimentação ininterrupta (UPS / No-Break).
-
-O sistema comunica diretamente com o **NUT (Network UPS Tools)** e o driver `invt_modbus` conectado via USB (`/dev/ups-usb`), expondo métricas elétricas instantâneas, diagramas de fluxo de potência em tempo real (SSE), planos de desligamento de servidores virtualizados (Proxmox VE e VMware ESXi) e notificações multicanal instantâneas (WhatsApp, Microsoft Teams, Google Chat, SMS e SMTP).
+1. [Overview](#-overview)
+2. [Architecture](#-architecture)
+3. [Key Features](#-key-features)
+   - [Real-Time Synoptic Power Flow Diagram](#1-real-time-synoptic-power-flow-diagram)
+   - [Infrastructure Shutdown Orchestration](#2-infrastructure-shutdown-orchestration)
+   - [Multi-Channel Notification Gateways](#3-multi-channel-notification-gateways)
+   - [Built-In REST API v1](#4-built-in-rest-api-v1)
+4. [Modules & Microservices](#-modules--microservices)
+5. [Installation & Deployment](#-installation--deployment)
+   - [System Prerequisites](#system-prerequisites)
+   - [Web Application Setup (Python/Flask)](#web-application-setup-pythonflask)
+   - [WhatsApp Microservice Setup (Baileys MD)](#whatsapp-microservice-setup-baileys-md)
+   - [Systemd Services Configuration](#systemd-services-configuration)
+6. [Network & Static Routing Configuration](#-network--static-routing-configuration)
+7. [REST API Reference](#-rest-api-reference)
+8. [Project Structure](#-project-structure)
+9. [License](#-license)
 
 ---
 
-## 🏗 Arquitetura do Sistema
+## 🌟 Overview
+
+**NUT Panel** is an open-source, full-stack enterprise web dashboard and automation orchestrator for Uninterruptible Power Supplies (UPS / No-Break).
+
+It interfaces natively with **Network UPS Tools (`upsd`)** over TCP socket protocol (`port 3493`), capturing live telemetry, evaluating complex threshold rules, executing staged graceful shutdowns of virtualized hypervisors (Proxmox VE via native SSH CLI and VMware ESXi), and delivering real-time actionable notifications across all major corporate messaging platforms.
+
+---
+
+## 🏗 Architecture
 
 ```
                       +------------------------------------------+
-                      |         UPS INVT HT1106XS (6kVA)         |
-                      |   Online Double Conversion (Modbus USB)  |
+                      |         Industrial / Commercial UPS      |
+                      |   (Modbus, USB, SNMP or Serial Interface)|
                       +--------------------+---------------------+
                                            |
-                                 [/dev/ups-usb]
+                                      [/dev/ups]
                                            |
                       +--------------------+---------------------+
                       |       NUT Daemon (upsd / port 3493)      |
                       +--------------------+---------------------+
                                            |
                       +--------------------+---------------------+
-                      |   Enging Core Engine (Python / Flask)    |
+                      |       NUT Panel Core Engine (Flask)      |
                       |     - Server-Sent Events (SSE Stream)    |
-                      |     - Regras de Alerta & Deduplicação    |
-                      |     - Orquestrador de Shutdown (SSH/API) |
+                      |     - Alert Rules & Deduplication Engine |
+                      |     - Staged Shutdown Orchestrator (SSH) |
                       |     - REST API v1 (Bearer Token Auth)    |
                       +----------+-------------------+-----------+
                                  |                   |
             +--------------------+---+           +---+--------------------+
-            | Microserviço WhatsApp  |           | Gateways de Notificação|
+            | WhatsApp Microservice  |           | Multi-Channel Gateways |
             | (Node.js / Baileys MD) |           | - Microsoft Teams Card |
-            |      [Porta 3001]      |           | - Google Chat CardsV2  |
-            +------------------------+           | - Webhooks Genéricos   |
+            |      [Port 3001]       |           | - Google Chat CardsV2  |
+            +------------------------+           | - Custom Webhooks/SIEM |
                                                  | - SMS Gateway API      |
-                                                 | - SMTP (Office 365)    |
+                                                 | - SMTP (Email Alerts)  |
                                                  +------------------------+
                                  |
             +--------------------+-------------------+
-            | Infraestrutura Gerida (Shutdown Auto)  |
-            | - Nós Proxmox VE (via SSH CLI Nativo)  |
-            | - Hipervisores VMware ESXi (CLI/API)   |
+            | Managed Infrastructure (Graceful Auto) |
+            | - Proxmox VE Nodes (Native SSH CLI)    |
+            | - VMware ESXi Hypervisors (CLI / API)  |
             +----------------------------------------+
 ```
 
 ---
 
-## 🚀 Funcionalidades Principais
+## 🚀 Key Features
 
-### 1. Diagrama Sinóptico de Fluxo de Energia
-- **Visualização Dinâmica em Tempo Real**: Trajeto elétrico ativo com animações de pulso luminoso diferenciadas para:
-  - **Rede Elétrica (Mains AC)**: Tensão RMS, Corrente, Frequência (Hz) e Fator de Potência (PF).
-  - **Retificador & Carregador**: Estado operacional e fluxo DC para baterias.
-  - **Banco de Baterias**: Percentual de carga residual, Tensão DC do barramento e Corrente de carga/descarga.
-  - **Inversor & Modo Bypass**: Indicação instantânea de Bypass Ativo vs Inversor Online.
-  - **Carga de Saída (Output AC)**: Percentual de carga (%), Potência Aparente (VA) e Potência Ativa (W).
-- **Tempo Real com SSE (Server-Sent Events)**: Atualização a cada 2 segundos sem polling excessivo no browser.
+### 1. Real-Time Synoptic Power Flow Diagram
+- **Dynamic Energy Topology**: Live animated electrical schematic indicating:
+  - **Mains AC Input**: Voltage (V), Current (A), Frequency (Hz), and Power Factor (PF).
+  - **Rectifier / Battery Charger**: Charging and float status.
+  - **DC Battery Bank**: Real-time Charge (%), DC Bus Voltage (V), and discharge currents.
+  - **Inverter & Static Bypass**: Seamless mode visualization (Online Double-Conversion vs. Bypass).
+  - **AC Output Load**: Active Power (W), Apparent Power (VA), and Load Percentage (%).
+- **Server-Sent Events (SSE)**: Zero-lag sub-second updates without browser polling.
 
-### 2. Orquestrador de Desligamento Automatizado (Graceful Shutdown)
-- **Modos de Operação**:
-  - **Automático**: Disparo programado com base no nível crítico de bateria ou perda prolongada de rede elétrica.
-  - **Manual**: Execução de planos de contingência com um clique a partir do painel.
-- **Suporte Proxmox VE via SSH Nativo**:
-  - Comunicação segura via SSH (Porta 22 com Palavra-passe ou Chave Privada RSA/Ed25519).
-  - Deteção e inventário automático de Máquinas Virtuais (`qm list`) e Contentores LXC (`pct list`).
-  - Sequenciamento por prioridade (Stage 1: VMs não críticas -> Stage 2: VMs críticas/BD -> Stage 3: Shutdown do Host Proxmox `shutdown -h now`).
-- **Suporte VMware ESXi**:
-  - Deteção de VMs e encerramento ordenado via comandos `esxcli`.
-- **Prevenção de Falsos Positivos**: Cooldown de segurança e cancelamento manual durante a contagem decrescente.
+### 2. Infrastructure Shutdown Orchestration
+- **Dual Trigger Modes**:
+  - **Automated Mode**: Condition-based triggers (e.g., Battery Charge $\le 20\%$ or Mains outage $> 300$s).
+  - **Manual Emergency Mode**: Controlled execution directly from the dashboard.
+- **Proxmox VE via Native SSH CLI**:
+  - Direct connection over SSH (Port 22, Password or RSA/Ed25519 Private Key).
+  - Automatic inventory detection for Virtual Machines (`qm list`) and LXC Containers (`pct list`).
+  - Three-stage sequenced shutdown (Stage 1: Non-critical VMs $\rightarrow$ Stage 2: Databases & critical workloads $\rightarrow$ Stage 3: Proxmox Host `shutdown -h now`).
+- **VMware ESXi Support**:
+  - Guest VM graceful shutdown via `esxcli` / API.
 
-### 3. Central Multicanal de Alertas & Notificações
-- **WhatsApp Multi-Device (Baileys MD)**:
-  - Gestão de múltiplas contas/sessões simultâneas com persistência de credenciais em disco.
-  - Modal interativo com interface de chat completa, histórico de mensagens e envio de mensagens de teste em tempo real.
-  - Alertas com formatação rica e marcadores dinâmicos (`{ups_name}`, `{battery_charge}`, `{input_voltage}`, `{output_load}`, `{event_time}`).
-- **Microsoft Teams (Adaptive Cards 1.4)**:
-  - Layout corporativo com cartão estruturado, cabeçalho colorido por severidade (Crítico: Laranja/Vermelho, Aviso: Amarelo, Normal: Verde).
-  - Grelha detalhada de métricas e deduplicação inteligente de eventos.
+### 3. Multi-Channel Notification Gateways
+- **WhatsApp Multi-Device (Baileys Node.js Microservice)**:
+  - Independent daemon with QR Code pairing, multi-session state persistence, live chat modal, and real-time interactive simulator.
+  - Dynamic template variables (`{rule_name}`, `{battery_charge}`, `{input_voltage}`, `{output_load}`, `{now}`).
+- **Microsoft Teams (Adaptive Cards 1.4 & Webhooks)**:
+  - Rich structured cards with severity-based theme accents (Critical / Warning / Normal) and metric grids.
+  - Built-in deduplication filter preventing duplicate messages.
 - **Google Chat (CardsV2)**:
-  - Integração com espaços do Google Workspace via webhook no formato CardsV2.
-- **Webhooks Genéricos & SIEM**:
-  - Envio de payloads JSON com cabeçalhos de autenticação customizáveis (`Bearer`, `Basic`, `ApiKey`).
+  - Google Workspace Space webhooks in interactive CardsV2 layout with action buttons.
+- **Generic Webhooks & SIEM**:
+  - Configurable JSON payloads and HTTP authentication headers (`Bearer`, `Basic`, `ApiKey`).
 - **SMS Gateway**:
-  - Integração HTTP GET/POST com provedores GSM / Gateways de SMS industriais.
-- **Email (SMTP)**:
-  - Suporte completo para Microsoft 365, Google Workspace e servidores de correio internos com STARTTLS / SSL.
+  - HTTP GET/POST interface compatible with GSM gateways and cellular routers.
+- **SMTP Email**:
+  - Modern TLS/SSL email delivery compatible with Microsoft 365, Google Workspace, and internal mail relays.
 
-### 4. API RESTful v1 Integrada
-- Autenticação por **Bearer Token** (`Bearer eng_live_...`).
-- Suporte a geração, revogação e rotação de chaves de API com controlo de permissões (`read`, `write`, `admin`).
-- Endpoints completos para ingestão em sistemas de terceiros (Zabbix, Grafana, Home Assistant, Prometheus).
+### 4. Built-In REST API v1
+- Secured via **Bearer Tokens** (`Bearer nut_live_...`).
+- Granular permission scopes (`read`, `write`, `admin`).
+- Ideal for integration with Grafana, Zabbix, Home Assistant, and Prometheus exporters.
 
 ---
 
-## 📦 Módulos & Microsserviços
+## 📦 Modules & Microservices
 
-| Ficheiro | Responsabilidade |
+| File / Directory | Description |
 | :--- | :--- |
-| `app.py` | Servidor web Flask principal, rotas de visualização, SSE stream e endpoints REST API. |
-| `nut_client.py` | Cliente de comunicação TCP com o protocolo de rede do NUT daemon (`upsd:3493`). |
-| `shutdown_manager.py` | Orquestrador de sequências de desligamento, estágios e execução remota SSH. |
-| `connections_manager.py`| Gestor de conexões aos nós Proxmox VE (SSH), VMware e chaves de API REST. |
-| `alert_manager.py` | Motor de avaliação de regras de alerta, cooldown e dispatch para gateways. |
-| `auth_manager.py` | Controlo de sessões web, autenticação multi-utilizador e hash de passwords com salt. |
-| `whatsapp_service/server.js` | Microsserviço Node.js independente baseado na biblioteca `@whiskeysockets/baileys`. |
-| `deploy_to_server.py` | Script de automação e implantação remota via SSH/SFTP para o servidor de produção. |
+| `app.py` | Flask core application, routing, SSE streaming, and API endpoints. |
+| `nut_client.py` | Low-level TCP socket client for the NUT `upsd` protocol. |
+| `shutdown_manager.py` | Staged shutdown engine with Proxmox SSH execution and progress tracking. |
+| `connections_manager.py`| Connection settings for NUT, Proxmox SSH, VMware, and API keys. |
+| `alert_manager.py` | Rules evaluation engine, event cooldowns, and notification dispatchers. |
+| `auth_manager.py` | Multi-user authentication, password hashing with salt, and session management. |
+| `whatsapp_service/server.js` | Node.js WhatsApp Web microservice using `@whiskeysockets/baileys`. |
+| `static/` & `templates/` | Pure light-theme UI, Tailwind CSS, Chart.js, and Lucide Icons. |
 
 ---
 
-## 🛠 Instalação & Configuração em Produção
+## 🛠 Installation & Deployment
 
-### Pré-requisitos
-- Ubuntu Server 22.04 LTS / 24.04 LTS ou Debian 12
-- Python 3.10+ com `pip` e `venv`
-- Node.js 18+ e `npm`
-- Servidor NUT (`nut-server`, `nut-client`) configurado com driver `invt_modbus`
+### System Prerequisites
+- Linux OS (Ubuntu 22.04/24.04 LTS, Debian 12, or AlmaLinux/Rocky)
+- Python 3.10+ with `pip` and `venv`
+- Node.js 18+ and `npm`
+- Running NUT server (`upsd`) with appropriate UPS driver configured
 
-### Configuração do Serviço Web (Python/Flask)
+### Web Application Setup (Python/Flask)
 ```bash
-# 1. Clonar o repositório para o diretório de destino
-sudo mkdir -p /opt/nut-dashboard
-sudo chown -R $USER:$USER /opt/nut-dashboard
-cd /opt/nut-dashboard
+# 1. Clone repository
+git clone https://github.com/andregabry/NUT-Panel.git /opt/nut-panel
+cd /opt/nut-panel
 
-# 2. Criar ambiente virtual e instalar dependências Python
+# 2. Setup Python Virtual Environment
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Configuração do Microsserviço WhatsApp (Baileys MD)
+### WhatsApp Microservice Setup (Baileys MD)
 ```bash
-# Entrar no diretório do serviço WhatsApp
-cd /opt/nut-dashboard/whatsapp_service
-
-# Instalar pacotes npm
+# 3. Install Node.js dependencies
+cd /opt/nut-panel/whatsapp_service
 npm install
 ```
 
-### Configuração dos Serviços Systemd
+### Systemd Services Configuration
 
-#### 1. Serviço Web Flask (`/etc/systemd/system/nut-dashboard.service`)
+#### 1. Core Web Dashboard (`/etc/systemd/system/nut-panel.service`)
 ```ini
 [Unit]
-Description=Enging UPS Dashboard & Core Management System
+Description=NUT Panel - Core Web Management Service
 After=network.target nut-server.service
 
 [Service]
 Type=simple
-User=enging
-WorkingDirectory=/opt/nut-dashboard
-ExecStart=/opt/nut-dashboard/venv/bin/python app.py
+User=root
+WorkingDirectory=/opt/nut-panel
+ExecStart=/opt/nut-panel/venv/bin/python app.py
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
+Environment=WEB_PORT=8080
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-#### 2. Serviço WhatsApp (`/etc/systemd/system/nut-whatsapp.service`)
+#### 2. WhatsApp Microservice (`/etc/systemd/system/nut-whatsapp.service`)
 ```ini
 [Unit]
-Description=Enging UPS WhatsApp Baileys MD Microservice
+Description=NUT Panel - WhatsApp Web Microservice (Baileys)
 After=network.target
 
 [Service]
 Type=simple
-User=enging
-WorkingDirectory=/opt/nut-dashboard/whatsapp_service
+User=root
+WorkingDirectory=/opt/nut-panel/whatsapp_service
 ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=5
@@ -211,17 +206,19 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-# Recarregar systemd e ativar os serviços
+# Enable and start services
 sudo systemctl daemon-reload
-sudo systemctl enable --now nut-dashboard.service
+sudo systemctl enable --now nut-panel.service
 sudo systemctl enable --now nut-whatsapp.service
 ```
 
+Access the web interface at **`http://<SERVER_IP>:8080`** (Default user: `admin` / `admin`).
+
 ---
 
-## 🌐 Configurações de Rede & Rotas Estáticas
+## 🌐 Network & Static Routing Configuration
 
-Para permitir que o servidor da aplicação (`10.255.255.28/24`) comunique com nós de virtualização e infraestrutura localizados em sub-redes internas como `192.168.4.0/23` e `192.168.10.0/23`, certifique-se de configurar as rotas estáticas persistentes no Netplan (`/etc/netplan/50-cloud-init.yaml`):
+When running NUT Panel on dedicated or isolated subnets (e.g. `10.255.255.0/24`) that need to reach hypervisors across other internal subnets (`192.168.4.0/23`, `192.168.10.0/23`), configure persistent routes in Netplan (`/etc/netplan/50-cloud-init.yaml`):
 
 ```yaml
 network:
@@ -247,84 +244,93 @@ network:
           - 8.8.8.8
 ```
 
-Aplicar alterações de rede:
+Apply network routes:
 ```bash
 sudo netplan apply
 ```
 
 ---
 
-## 📡 Referência da API REST
+## 📡 REST API Reference
 
-Todas as chamadas à API requerem o cabeçalho HTTP:
+All API requests require the standard HTTP authorization header:
 ```http
-Authorization: Bearer <SEU_TOKEN_API>
+Authorization: Bearer <YOUR_API_TOKEN>
 Content-Type: application/json
 ```
 
-### Endpoints Principais
+### Endpoints
 
-| Método | Endpoint | Descrição |
+| Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/api/v1/ups/live` | Retorna o estado completo da UPS, métricas elétricas e alarmes ativos. |
-| `GET` | `/api/v1/ups/variables` | Retorna a totalidade dos dados brutos disponibilizados pelo driver Modbus. |
-| `GET` | `/api/v1/shutdown/status` | Retorna o status de contingência e progresso do plano de desligamento. |
-| `POST`| `/api/v1/shutdown/execute` | Inicia manualmente um plano de desligamento orquestrado. |
-| `POST`| `/api/v1/shutdown/abort` | Cancela imediatamente uma sequência de desligamento em contagem. |
-| `POST`| `/api/v1/alerts/test` | Dispara uma mensagem de teste para o gateway especificado. |
-| `GET` | `/api/v1/connections/proxmox/test` | Valida conectividade SSH com nós Proxmox configurados. |
+| `GET` | `/api/v1/ups/live` | Live UPS metrics, electrical telemetry, and active alarms. |
+| `GET` | `/api/v1/ups/variables` | Full raw key-value parameter dump from the NUT driver. |
+| `GET` | `/api/v1/shutdown/status` | Current contingency state and staged shutdown progress. |
+| `POST`| `/api/v1/shutdown/execute` | Manually triggers an infrastructure shutdown plan. |
+| `POST`| `/api/v1/shutdown/abort` | Immediately aborts a pending shutdown sequence. |
+| `POST`| `/api/v1/alerts/test` | Triggers a test message on a specified channel. |
+| `GET` | `/api/v1/connections/proxmox/test` | Tests SSH connectivity to configured Proxmox nodes. |
 
-#### Exemplo de Resposta (`GET /api/v1/ups/live`):
+#### Sample Response (`GET /api/v1/ups/live`):
 ```json
 {
-  "status": "online",
-  "battery_charge": 100,
-  "battery_voltage": 218.4,
-  "input_voltage": 230.1,
-  "input_frequency": 50.0,
-  "output_voltage": 230.0,
-  "output_load": 18,
-  "output_power_w": 1080,
-  "output_power_va": 1150,
-  "temperature": 27.5,
-  "alarms": [],
-  "ups_status_raw": "OL"
+  "success": true,
+  "data": {
+    "status": {
+      "label": "ONLINE",
+      "is_online": true,
+      "on_battery": false,
+      "low_battery": false,
+      "raw_flags": "OL"
+    },
+    "battery": {
+      "charge_pct": 100,
+      "voltage": 218.4,
+      "runtime_seconds": 3600
+    },
+    "input": {
+      "voltage": 230.1,
+      "frequency": 50.0
+    },
+    "output": {
+      "voltage": 230.0,
+      "load_pct": 18,
+      "real_power_w": 1080,
+      "apparent_power_va": 1150
+    }
+  }
 }
 ```
 
 ---
 
-## 🗂 Estrutura de Ficheiros do Projeto
+## 🗂 Project Structure
 
 ```
-NUT/
-├── alert_manager.py             # Motor de alertas e integrações
-├── app.py                       # Aplicação principal Flask
-├── auth_manager.py              # Gestão de utilizadores e sessões
-├── config.py                    # Ficheiro central de configurações
-├── connections_manager.py       # Gestão de Proxmox SSH, VMware & Tokens API
-├── deploy_to_server.py          # Script de deploy automatizado via SFTP/SSH
-├── nut_client.py                # Cliente de baixo nível NUT TCP
-├── shutdown_manager.py          # Motor de encerramento orquestrado de nós
-├── requirements.txt             # Dependências Python
+NUT-Panel/
+├── alert_manager.py             # Alert rules evaluation & notification dispatch
+├── app.py                       # Main Flask web server & SSE controller
+├── auth_manager.py              # User sessions & authentication management
+├── config.py                    # Global application configuration
+├── connections_manager.py       # NUT, Proxmox SSH, VMware & API token management
+├── nut_client.py                # Network UPS Tools TCP client
+├── shutdown_manager.py          # Staged graceful shutdown orchestrator
+├── requirements.txt             # Python dependencies
 ├── static/
 │   ├── css/
-│   │   └── style.css            # Estilos personalizados e tema Enging
-│   ├── js/
-│   │   └── app.js               # Lógica de interface, SSE e WebSockets
-│   └── img/
-│       ├── logo-horizontal.png
-│       └── logo-vertical.png
+│   │   └── style.css            # Custom CSS & clean light theme
+│   └── js/
+│       └── app.js               # Reactive frontend logic, SSE & WebSocket
 ├── templates/
-│   ├── index.html               # Interface principal de gestão
-│   └── login.html               # Ecrã de autenticação
+│   ├── index.html               # Main dashboard & management UI
+│   └── login.html               # Login screen
 └── whatsapp_service/
-    ├── package.json             # Dependências Node.js
-    └── server.js                # Servidor Baileys Multi-Device
+    ├── package.json             # Node.js dependencies
+    └── server.js                # Baileys Multi-Device microservice
 ```
 
 ---
 
-<div align="center">
-  <p>© 2026 <strong>Enging - Make Solutions</strong>. Todos os direitos reservados.</p>
-</div>
+## 📄 License
+
+This project is licensed under the MIT License.

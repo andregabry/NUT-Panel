@@ -25,15 +25,15 @@ class ConnectionsManager:
 
     def _get_default_data(self) -> Dict[str, Any]:
         default_token_id = str(uuid.uuid4())
-        default_token_key = f"eng_live_{secrets.token_hex(16)}"
+        default_token_key = f"nut_live_{secrets.token_hex(16)}"
         
         return {
             "nut_server": {
-                "host": "10.255.255.28",
+                "host": "127.0.0.1",
                 "port": 3493,
                 "ups_name": "ups",
-                "username": "enging",
-                "password": "enging!pt",
+                "username": "admin",
+                "password": "admin123",
                 "poll_interval": 2.0,
                 "timeout": 5.0,
                 "status": "online",
@@ -43,16 +43,13 @@ class ConnectionsManager:
                 {
                     "id": str(uuid.uuid4()),
                     "name": "Cluster Proxmox PVE01",
-                    "host": "10.255.255.10",
-                    "port": 8006,
+                    "host": "192.168.1.10",
+                    "port": 22,
                     "node_name": "pve01",
-                    "auth_type": "token", # "token" or "password"
-                    "realm": "pve", # "pve" or "pam"
-                    "token_id": "root@pam!nut_automation",
-                    "token_secret": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-                    "username": "root@pam",
+                    "auth_type": "password",
+                    "username": "root",
                     "password": "",
-                    "verify_ssl": False,
+                    "private_key": "",
                     "enabled": True,
                     "status": "idle",
                     "last_test": None
@@ -62,7 +59,7 @@ class ConnectionsManager:
                 {
                     "id": str(uuid.uuid4()),
                     "name": "Host VMware ESXi 01",
-                    "host": "10.255.255.20",
+                    "host": "192.168.1.20",
                     "port": 443,
                     "type": "esxi", # "esxi" or "vcenter"
                     "auth_type": "rest_api", # "rest_api" or "ssh"
@@ -76,18 +73,18 @@ class ConnectionsManager:
             ],
             "messaging_gateways": {
                 "whatsapp": {
-                    "provider": "evolution", # "evolution", "zapi", "custom_webhook"
-                    "api_url": "https://api.whatsapp.example.com/message/sendText",
+                    "provider": "baileys",
+                    "api_url": "http://127.0.0.1:3001",
                     "api_token": "",
-                    "instance_id": "enging-ups",
-                    "enabled": False,
+                    "instance_id": "nut-panel",
+                    "enabled": True,
                     "last_test": None
                 },
                 "sms": {
                     "provider": "http_api",
                     "api_url": "https://api.sms-gateway.example.com/send",
                     "api_token": "",
-                    "sender_id": "ENGING_UPS",
+                    "sender_id": "NUT_PANEL",
                     "enabled": False,
                     "last_test": None
                 },
@@ -95,18 +92,18 @@ class ConnectionsManager:
                     "host": "smtp.gmail.com",
                     "port": 587,
                     "use_tls": True,
-                    "username": "alerts@enging.pt",
+                    "username": "alerts@example.com",
                     "password": "",
-                    "from_email": "alerts@enging.pt",
-                    "from_name": "Enging UPS System",
+                    "from_email": "alerts@example.com",
+                    "from_name": "NUT Panel",
                     "enabled": False,
                     "last_test": None
                 },
                 "webhooks": [
                     {
                         "id": str(uuid.uuid4()),
-                        "name": "Zabbix / SIEM Webhook",
-                        "url": "https://zabbix.enging.pt/api/webhook/ups",
+                        "name": "SIEM / Webhook Central",
+                        "url": "https://monitoring.example.com/api/webhook/ups",
                         "secret_token": "secret_token_123",
                         "event_types": ["power_loss", "battery_low", "shutdown_triggered"],
                         "enabled": True,
@@ -486,7 +483,7 @@ class ConnectionsManager:
         with self.lock:
             tokens = self.data.setdefault("api_tokens", [])
             token_id = str(uuid.uuid4())
-            secret = f"eng_live_{secrets.token_hex(20)}"
+            secret = f"nut_live_{secrets.token_hex(20)}"
             
             entry = {
                 "id": token_id,

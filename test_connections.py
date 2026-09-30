@@ -4,7 +4,7 @@ import json
 
 SERVER = "10.255.255.28"
 USER = "enging"
-PASS = "enging!pt"
+PASS = "password123"
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())

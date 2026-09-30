@@ -1,7 +1,7 @@
 {
   "name": "nut-whatsapp-service",
   "version": "1.0.0",
-  "description": "WhatsApp Web Multi-Device Microservice for Enging UPS System Alerts",
+  "description": "WhatsApp Web Multi-Device Microservice for NUT Panel Alerts",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

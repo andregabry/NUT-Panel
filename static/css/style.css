@@ -1,9 +1,12 @@
-/* Enging UPS System - Pure Light Theme & Custom Animations */
+/* NUT Panel - Pure Light Theme & Custom Animations */
 
 :root {
-    --color-enging-navy: #223546;
-    --color-enging-orange: #e95c0c;
-    --color-enging-blue: #184e8e;
+    --color-brand-navy: #1e293b;
+    --color-brand-orange: #ea580c;
+    --color-brand-blue: #2563eb;
+    --color-slate-800: #1e293b;
+    --color-orange-600: #ea580c;
+    --color-blue-600: #2563eb;
 }
 
 body {

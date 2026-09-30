@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Enging UPS System</title>
+    <title>Login | NUT Panel</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -11,14 +11,14 @@
             theme: {
                 extend: {
                     colors: {
-                        enging: {
-                            navy: '#223546',
-                            'navy-dark': '#192836',
-                            'navy-light': '#2c4358',
-                            orange: '#e95c0c',
-                            'orange-hover': '#d04f08',
-                            'orange-light': '#fff3ed',
-                            blue: '#184e8e'
+                        brand: {
+                            navy: '#1e293b',
+                            'navy-dark': '#0f172a',
+                            'navy-light': '#334155',
+                            orange: '#ea580c',
+                            'orange-hover': '#c2410c',
+                            'orange-light': '#fff7ed',
+                            blue: '#2563eb'
                         }
                     }
                 }
@@ -32,30 +32,32 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex items-center justify-center p-4 font-sans selection:bg-enging-orange selection:text-white relative overflow-hidden">
+<body class="bg-slate-100 text-slate-800 min-h-screen flex items-center justify-center p-4 font-sans selection:bg-orange-500 selection:text-white relative overflow-hidden">
 
     <!-- Background subtle geometric accents -->
-    <div class="absolute -top-32 -left-32 w-96 h-96 bg-enging-navy/5 rounded-full blur-3xl pointer-events-none"></div>
-    <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-enging-orange/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-slate-900/5 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
     <!-- Decorative Top Line Bar with Brand Colors -->
-    <div class="fixed top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-enging-navy via-enging-navy to-enging-orange"></div>
+    <div class="fixed top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-slate-800 via-slate-700 to-orange-500"></div>
 
     <div class="w-full max-w-md relative z-10">
         
         <!-- Login Card -->
         <div class="rounded-3xl border border-slate-200 bg-white/95 backdrop-blur-xl p-8 sm:p-10 shadow-xl shadow-slate-300/60 relative">
             
-            <!-- Branding Header (Vertical Logo) -->
+            <!-- Branding Header -->
             <div class="text-center mb-8">
-                <div class="inline-block p-4 rounded-2xl bg-white shadow-sm border border-slate-100 mb-4">
-                    <img src="/static/img/logo-vertical-transparent.png" alt="Enging Logo" class="h-20 w-auto mx-auto object-contain">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-50 text-orange-600 border border-orange-200 mb-4 shadow-sm">
+                    <i data-lucide="zap" class="w-8 h-8 text-orange-600 stroke-[2.5]"></i>
                 </div>
-                <h1 class="text-2xl font-black text-enging-navy tracking-tight">Enging UPS System</h1>
-                <p class="text-xs text-slate-500 mt-1 font-medium">Monitorização e Automação de Energia</p>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-1.5">
+                    <span>NUT</span><span class="text-orange-600">Panel</span>
+                </h1>
+                <p class="text-xs text-slate-500 mt-1 font-medium">Monitorização e Automação de UPS</p>
                 <div class="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full bg-slate-50 text-[11px] text-slate-600 font-mono border border-slate-200">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>INVT HT1106XS • 10.255.255.28</span>
+                    <span>UPS Network Tools Protocol</span>
                 </div>
             </div>
 
@@ -63,22 +65,22 @@
             <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
                 
                 <div>
-                    <label for="username" class="block text-xs font-bold text-enging-navy uppercase tracking-wider mb-1.5">Utilizador</label>
+                    <label for="username" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Utilizador</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                             <i data-lucide="user" class="w-4 h-4"></i>
                         </div>
-                        <input type="text" id="username" name="username" required autofocus placeholder="admin" class="w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-enging-orange focus:ring-2 focus:ring-enging-orange/20 transition">
+                        <input type="text" id="username" name="username" required autofocus placeholder="admin" class="w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition">
                     </div>
                 </div>
 
                 <div>
-                    <label for="password" class="block text-xs font-bold text-enging-navy uppercase tracking-wider mb-1.5">Senha</label>
+                    <label for="password" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Senha</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                             <i data-lucide="lock" class="w-4 h-4"></i>
                         </div>
-                        <input type="password" id="password" name="password" required placeholder="••••••••" class="w-full pl-10 pr-10 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-enging-orange focus:ring-2 focus:ring-enging-orange/20 transition">
+                        <input type="password" id="password" name="password" required placeholder="••••••••" class="w-full pl-10 pr-10 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition">
                         <button type="button" onclick="togglePassVisibility()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600">
                             <i id="pass-eye-icon" data-lucide="eye" class="w-4 h-4"></i>
                         </button>
@@ -86,7 +88,7 @@
                 </div>
 
                 <div class="pt-2">
-                    <button type="submit" id="btn-submit" class="w-full py-3 px-4 rounded-xl bg-enging-orange hover:bg-enging-orange-hover text-white font-bold text-sm shadow-lg shadow-enging-orange/25 transition duration-150 flex items-center justify-center gap-2">
+                    <button type="submit" id="btn-submit" class="w-full py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm shadow-lg shadow-orange-600/25 transition duration-150 flex items-center justify-center gap-2">
                         <span id="btn-text">Entrar no Sistema</span>
                         <i id="btn-icon" data-lucide="log-in" class="w-4 h-4"></i>
                     </button>
@@ -95,7 +97,7 @@
             </form>
 
             <div class="mt-8 pt-4 border-t border-slate-100 text-center text-xs text-slate-400">
-                <span>Acesso Seguro • <strong class="text-enging-navy font-mono">Enging UPS</strong></span>
+                <span>Acesso Seguro • <strong class="text-slate-700 font-mono">NUT Panel</strong></span>
             </div>
 
         </div>
@@ -108,7 +110,7 @@
         const swalLight = Swal.mixin({
             background: '#ffffff',
             color: '#1e293b',
-            confirmButtonColor: '#e95c0c',
+            confirmButtonColor: '#ea580c',
             cancelButtonColor: '#64748b',
             customClass: {
                 popup: 'rounded-2xl shadow-2xl border border-slate-200',

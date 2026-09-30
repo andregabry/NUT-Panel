@@ -49,10 +49,6 @@ def deploy():
         ("templates/index.html", f"{REMOTE_DIR}/templates/index.html"),
         ("static/css/style.css", f"{REMOTE_DIR}/static/css/style.css"),
         ("static/js/app.js", f"{REMOTE_DIR}/static/js/app.js"),
-        ("static/img/logo-horizontal-transparent.png", f"{REMOTE_DIR}/static/img/logo-horizontal-transparent.png"),
-        ("static/img/logo-vertical-transparent.png", f"{REMOTE_DIR}/static/img/logo-vertical-transparent.png"),
-        ("static/img/logo-horizontal.png", f"{REMOTE_DIR}/static/img/logo-horizontal.png"),
-        ("static/img/logo-vertical.png", f"{REMOTE_DIR}/static/img/logo-vertical.png"),
         ("whatsapp_service/server.js", f"{REMOTE_DIR}/whatsapp_service/server.js"),
     ]
 

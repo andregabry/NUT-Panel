@@ -63,8 +63,8 @@ function saveMessagesToDisk() {
 
 // Configurações de Sessão (Nome Personalizado & Avatar desta Sessão)
 let sessionConfig = {
-    name: 'Enging UPS Notifier ⚡',
-    avatar: 'enging', // 'enging', 'robot', 'server', 'battery', or URL
+    name: 'NUT Panel Notifier ⚡',
+    avatar: 'zap', // 'zap', 'robot', 'server', 'battery', or URL
     custom_avatar_url: ''
 };
 try {
@@ -163,7 +163,7 @@ async function startWhatsApp() {
 
                 connectedUser = {
                     id: rawId,
-                    name: user.name || sessionConfig.name || 'Enging UPS Admin',
+                    name: user.name || sessionConfig.name || 'NUT Panel Admin',
                     phone: phone ? `+${phone}` : ''
                 };
             }
@@ -186,7 +186,7 @@ async function startWhatsApp() {
                     fromMe: fromMe,
                     target: remoteJid,
                     phone: senderPhone.startsWith('+') ? senderPhone : `+${senderPhone}`,
-                    senderName: fromMe ? (sessionConfig.name || 'Enging UPS') : (m.pushName || `+${senderPhone}`),
+                    senderName: fromMe ? (sessionConfig.name || 'NUT Panel') : (m.pushName || `+${senderPhone}`),
                     text: text,
                     timestamp: m.messageTimestamp ? Number(m.messageTimestamp) * 1000 : Date.now(),
                     formatted_time: new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
@@ -340,7 +340,7 @@ app.post('/send', async (req, res) => {
             fromMe: true,
             target: jid,
             phone: cleanPhone.startsWith('+') ? cleanPhone : `+${cleanPhone}`,
-            senderName: sessionConfig.name || 'Enging UPS Notifier',
+            senderName: sessionConfig.name || 'NUT Panel Notifier',
             text: content,
             timestamp: Date.now(),
             formatted_time: new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),

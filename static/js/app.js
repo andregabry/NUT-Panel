@@ -13,15 +13,15 @@ let currentSubView = 'overview';   // 'overview', 'telemetry', 'vars', 'plans', 
 let selectedPlanId = null;
 let currentVarCategory = 'all';
 
-// Light theme defaults for SweetAlert2 with Enging Brand Colors
-const swalEnging = Swal.mixin({
+// Light theme defaults for SweetAlert2 with Brand Colors
+const swalTheme = Swal.mixin({
     background: '#ffffff',
     color: '#1e293b',
     confirmButtonColor: '#e95c0c',
     cancelButtonColor: '#64748b',
     customClass: {
         popup: 'border border-slate-200 rounded-3xl shadow-2xl',
-        title: 'text-enging-navy font-bold text-lg',
+        title: 'text-slate-800 font-bold text-lg',
         htmlContainer: 'text-slate-600 text-sm'
     }
 });
@@ -139,7 +139,7 @@ function switchMainView(moduleName, subViewName = null) {
     const subBtnActive = (label, fn) => `
         <button onclick="${fn}" class="submenu-nav-link-active">
             <span>${label}</span>
-            <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-enging-orange"></i>
+            <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-orange-600"></i>
         </button>
     `;
     const subBtnInactive = (label, fn) => `
@@ -195,7 +195,7 @@ function switchMainView(moduleName, subViewName = null) {
             subContainer.innerHTML = `
                 <button onclick="switchMainView('automatization', 'plans')" class="submenu-nav-link-active">
                     <span>Planos</span>
-                    <span class="px-1.5 py-0.2 rounded bg-enging-orange text-white text-[10px] font-mono font-bold">${plansCount}</span>
+                    <span class="px-1.5 py-0.2 rounded bg-orange-600 text-white text-[10px] font-mono font-bold">${plansCount}</span>
                 </button>
                 <button onclick="openLogsModal()" class="submenu-nav-link-inactive">
                     <span>Histórico Logs</span>
@@ -711,21 +711,21 @@ function setText(id, text) {
 // ------------------------------------------------------------- //
 
 function openChangePasswordModal() {
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Alterar Senha de Acesso',
         html: `
             <div class="text-left space-y-3.5 mt-2 font-sans">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Senha Atual</label>
-                    <input id="swal-old-pass" type="password" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" placeholder="Senha atual">
+                    <input id="swal-old-pass" type="password" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-orange-600" placeholder="Senha atual">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nova Senha</label>
-                    <input id="swal-new-pass" type="password" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" placeholder="Mínimo 4 caracteres">
+                    <input id="swal-new-pass" type="password" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-orange-600" placeholder="Mínimo 4 caracteres">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Confirmar Nova Senha</label>
-                    <input id="swal-conf-pass" type="password" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" placeholder="Repita a nova senha">
+                    <input id="swal-conf-pass" type="password" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-orange-600" placeholder="Repita a nova senha">
                 </div>
             </div>
         `,
@@ -762,7 +762,7 @@ function openChangePasswordModal() {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: 'Sucesso!',
                         text: data.message,
@@ -770,10 +770,10 @@ function openChangePasswordModal() {
                         showConfirmButton: false
                     });
                 } else {
-                    swalEnging.fire('Erro', data.message, 'error');
+                    swalTheme.fire('Erro', data.message, 'error');
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao alterar senha: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao alterar senha: ' + e, 'error');
             }
         }
     });
@@ -790,7 +790,7 @@ function setVarCategoryFilter(cat) {
     const buttons = document.querySelectorAll('.var-filter-btn');
     buttons.forEach(btn => {
         if (btn.innerText.toLowerCase().includes(cat) || (cat === 'all' && btn.innerText.includes('Todos'))) {
-            btn.className = 'var-filter-btn px-3 py-1.5 rounded-lg bg-enging-orange text-white font-bold transition';
+            btn.className = 'var-filter-btn px-3 py-1.5 rounded-lg bg-orange-600 text-white font-bold transition';
         } else {
             btn.className = 'var-filter-btn px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium transition';
         }
@@ -841,16 +841,16 @@ function renderRawVarsTable(varsObj) {
     tbody.innerHTML = keys.map(k => {
         const cat = k.split('.')[0] || 'geral';
         const catBadge = cat === 'battery' 
-            ? '<span class="px-2 py-0.5 rounded-md bg-blue-50 text-enging-blue text-[10px] font-bold border border-blue-200">bateria</span>'
+            ? '<span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 text-[10px] font-bold border border-blue-200">bateria</span>'
             : cat === 'input'
             ? '<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 text-[10px] font-bold border border-amber-200">entrada</span>'
             : cat === 'output'
-            ? '<span class="px-2 py-0.5 rounded-md bg-orange-50 text-enging-orange text-[10px] font-bold border border-orange-200">saída</span>'
+            ? '<span class="px-2 py-0.5 rounded-md bg-orange-50 text-orange-600 text-[10px] font-bold border border-orange-200">saída</span>'
             : '<span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200">' + cat + '</span>';
 
         return `
             <tr class="hover:bg-slate-50 transition">
-                <td class="p-3.5 text-enging-navy font-bold">${k}</td>
+                <td class="p-3.5 text-slate-800 font-bold">${k}</td>
                 <td class="p-3.5 text-slate-800 font-medium">${varsObj[k]}</td>
                 <td class="p-3.5 text-right">${catBadge}</td>
             </tr>
@@ -860,7 +860,7 @@ function renderRawVarsTable(varsObj) {
 
 function copyRawVarsJson() {
     navigator.clipboard.writeText(JSON.stringify(currentRawVars, null, 2)).then(() => {
-        swalEnging.fire({
+        swalTheme.fire({
             icon: 'success',
             title: 'Copiado!',
             text: 'Todas as variáveis NUT foram copiadas em formato JSON.',
@@ -961,9 +961,9 @@ function renderPlansTabsAndPanel() {
         panelContainer.innerHTML = `
             <div class="p-10 text-center text-slate-500 rounded-2xl bg-white border border-slate-200 shadow-sm">
                 <i data-lucide="layers" class="w-12 h-12 mx-auto mb-3 text-slate-400"></i>
-                <h3 class="text-base font-bold text-enging-navy">Nenhum plano configurado</h3>
+                <h3 class="text-base font-bold text-slate-800">Nenhum plano configurado</h3>
                 <p class="text-xs text-slate-500 mt-1 mb-4">Crie o seu primeiro plano de desligamento em estágios (ex: VMs 60%, Hosts 15%).</p>
-                <button onclick="openCreatePlanModal()" class="px-4 py-2.5 rounded-xl bg-enging-orange hover:bg-enging-orange-hover text-white font-bold text-xs shadow-md shadow-enging-orange/20">
+                <button onclick="openCreatePlanModal()" class="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-600/20">
                     + Criar Novo Plano
                 </button>
             </div>
@@ -980,20 +980,20 @@ function renderPlansTabsAndPanel() {
     tabsBar.innerHTML = plans.map(p => {
         const isSelected = p.id === selectedPlanId;
         const activeClass = isSelected 
-            ? 'bg-white border-enging-orange text-enging-navy shadow-xs font-bold border-b-2'
-            : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-enging-navy hover:bg-slate-100 font-medium border-b';
+            ? 'bg-white border-orange-600 text-slate-800 shadow-xs font-bold border-b-2'
+            : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-medium border-b';
 
         return `
             <button onclick="selectPlanTab('${p.id}')" class="px-4 py-3 rounded-t-xl border-t border-x ${activeClass} transition flex items-center gap-2.5 whitespace-nowrap text-xs">
                 <span class="w-2 h-2 rounded-full ${p.enabled ? 'bg-emerald-500' : 'bg-slate-400'}"></span>
                 <span>${p.name}</span>
-                <span class="px-2 py-0.5 rounded-full bg-orange-50 text-enging-orange border border-orange-200 font-mono text-[10px] font-bold">
+                <span class="px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200 font-mono text-[10px] font-bold">
                     ≤ ${p.trigger_battery_pct}%
                 </span>
             </button>
         `;
     }).join('') + `
-        <button onclick="openCreatePlanModal()" class="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-enging-orange border border-slate-200 text-xs font-bold transition flex items-center gap-1.5 ml-1 shadow-xs" title="Adicionar Novo Plano">
+        <button onclick="openCreatePlanModal()" class="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-orange-600 border border-slate-200 text-xs font-bold transition flex items-center gap-1.5 ml-1 shadow-xs" title="Adicionar Novo Plano">
             <i data-lucide="plus" class="w-3.5 h-3.5"></i> Novo Plano
         </button>
     `;
@@ -1006,9 +1006,9 @@ function renderPlansTabsAndPanel() {
         ? `<tr><td colspan="6" class="p-6 text-center text-slate-400 italic">Nenhum servidor ou VM configurado neste plano. Clique em "+ Adicionar Alvo".</td></tr>`
         : servers.map(s => {
             const methodBadge = s.method === 'ssh' 
-                ? '<span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-enging-navy border border-slate-200 font-mono text-[10px] font-bold">SSH Linux</span>'
+                ? '<span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 font-mono text-[10px] font-bold">SSH Linux</span>'
                 : s.method === 'windows_ssh'
-                ? '<span class="px-2.5 py-0.5 rounded-full bg-blue-50 text-enging-blue border border-blue-200 font-mono text-[10px] font-bold">SSH Windows</span>'
+                ? '<span class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 font-mono text-[10px] font-bold">SSH Windows</span>'
                 : s.method === 'local_command'
                 ? '<span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono text-[10px] font-bold">Host Local NUT</span>'
                 : '<span class="px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-mono text-[10px] font-bold">Webhook API</span>';
@@ -1023,21 +1023,21 @@ function renderPlansTabsAndPanel() {
             return `
                 <tr class="hover:bg-slate-50 transition text-xs">
                     <td class="p-3.5">
-                        <div class="font-bold text-enging-navy">${s.name}</div>
+                        <div class="font-bold text-slate-800">${s.name}</div>
                         <div class="text-[11px] text-slate-500 font-mono truncate max-w-sm mt-0.5" title="${s.custom_command}">${s.custom_command || 'Padrão'}</div>
                     </td>
                     <td class="p-3.5 font-mono text-slate-600 font-medium">${s.host || s.webhook_url || 'local'}:${s.port || 22}</td>
                     <td class="p-3.5">${methodBadge}</td>
-                    <td class="p-3.5 font-mono text-enging-orange font-black">${s.delay_sec || 0}s</td>
+                    <td class="p-3.5 font-mono text-orange-600 font-black">${s.delay_sec || 0}s</td>
                     <td class="p-3.5">${testBadge}</td>
                     <td class="p-3.5 text-right space-x-1.5 whitespace-nowrap">
-                        <button onclick="testServerConnection('${activePlan.id}', '${s.id}')" title="Testar Conexão" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-enging-navy border border-slate-200 transition">
-                            <i data-lucide="zap" class="w-3.5 h-3.5 text-enging-orange"></i>
+                        <button onclick="testServerConnection('${activePlan.id}', '${s.id}')" title="Testar Conexão" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 transition">
+                            <i data-lucide="zap" class="w-3.5 h-3.5 text-orange-600"></i>
                         </button>
                         <button onclick="manualShutdownSingle('${activePlan.id}', '${s.id}')" title="Desligar Individual" class="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-700 border border-slate-200 transition">
                             <i data-lucide="power" class="w-3.5 h-3.5"></i>
                         </button>
-                        <button onclick="openAddServerModal('${activePlan.id}', '${s.id}')" title="Editar" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-enging-navy border border-slate-200 transition">
+                        <button onclick="openAddServerModal('${activePlan.id}', '${s.id}')" title="Editar" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-800 border border-slate-200 transition">
                             <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
                         </button>
                         <button onclick="deleteServer('${activePlan.id}', '${s.id}', '${s.name}')" title="Remover" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-rose-600 border border-slate-200 transition">
@@ -1055,26 +1055,26 @@ function renderPlansTabsAndPanel() {
             <div class="p-5 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <div class="flex items-center gap-3">
-                        <h3 class="text-base font-bold text-enging-navy">${activePlan.name}</h3>
+                        <h3 class="text-base font-bold text-slate-800">${activePlan.name}</h3>
                         <span id="plan-status-pill" class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-xs font-bold">
                             ${activePlan.enabled ? 'Pronto (Em Espera)' : 'Desativado'}
                         </span>
                     </div>
-                    <p class="text-xs text-slate-500 mt-1 font-medium">${activePlan.description || 'Sem descrição'} • <span class="text-enging-navy font-bold">${servers.length} alvos configurados</span></p>
+                    <p class="text-xs text-slate-500 mt-1 font-medium">${activePlan.description || 'Sem descrição'} • <span class="text-slate-800 font-bold">${servers.length} alvos configurados</span></p>
                 </div>
 
                 <!-- Plan Action Buttons -->
                 <div class="flex flex-wrap items-center gap-2">
-                    <button onclick="openAddServerModal('${activePlan.id}')" class="px-3.5 py-2 rounded-xl bg-enging-orange hover:bg-enging-orange-hover text-white font-bold text-xs shadow-md shadow-enging-orange/20 transition flex items-center gap-1.5">
+                    <button onclick="openAddServerModal('${activePlan.id}')" class="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-600/20 transition flex items-center gap-1.5">
                         <i data-lucide="plus-circle" class="w-4 h-4"></i> Adicionar Alvo
                     </button>
-                    <button onclick="runPlanDryRun('${activePlan.id}')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-enging-navy border border-slate-200 font-bold text-xs transition flex items-center gap-1.5">
+                    <button onclick="runPlanDryRun('${activePlan.id}')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 font-bold text-xs transition flex items-center gap-1.5">
                         <i data-lucide="play" class="w-4 h-4 text-emerald-600"></i> Simular (Dry-Run)
                     </button>
                     <button onclick="runPlanNow('${activePlan.id}', '${activePlan.name}')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-slate-200 font-bold text-xs transition flex items-center gap-1.5">
                         <i data-lucide="power" class="w-4 h-4"></i> Executar Agora
                     </button>
-                    <button onclick="openCreatePlanModal('${activePlan.id}')" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-enging-navy border border-slate-200 transition" title="Configurações do Plano">
+                    <button onclick="openCreatePlanModal('${activePlan.id}')" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-800 border border-slate-200 transition" title="Configurações do Plano">
                         <i data-lucide="settings" class="w-4 h-4"></i>
                     </button>
                     <button onclick="deletePlan('${activePlan.id}', '${activePlan.name}')" class="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 transition" title="Excluir Plano">
@@ -1086,22 +1086,22 @@ function renderPlansTabsAndPanel() {
             <!-- Plan Quick Parameters Bar -->
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50/80 border-b border-slate-100 text-xs">
                 <div class="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
-                    <div class="p-2.5 rounded-xl bg-orange-50 text-enging-orange">
+                    <div class="p-2.5 rounded-xl bg-orange-50 text-orange-600">
                         <i data-lucide="zap" class="w-4 h-4"></i>
                     </div>
                     <div>
                         <span class="text-[11px] text-slate-500 block uppercase font-bold">Nível de Disparo</span>
-                        <strong class="text-sm font-mono font-black text-enging-orange">Bateria ≤ ${activePlan.trigger_battery_pct}%</strong>
+                        <strong class="text-sm font-mono font-black text-orange-600">Bateria ≤ ${activePlan.trigger_battery_pct}%</strong>
                     </div>
                 </div>
 
                 <div class="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
-                    <div class="p-2.5 rounded-xl bg-blue-50 text-enging-blue">
+                    <div class="p-2.5 rounded-xl bg-blue-50 text-blue-600">
                         <i data-lucide="clock" class="w-4 h-4"></i>
                     </div>
                     <div>
                         <span class="text-[11px] text-slate-500 block uppercase font-bold">Tempo de Carência</span>
-                        <strong class="text-sm font-mono font-black text-enging-navy">${activePlan.grace_period_sec || 10} segundos</strong>
+                        <strong class="text-sm font-mono font-black text-slate-800">${activePlan.grace_period_sec || 10} segundos</strong>
                     </div>
                 </div>
 
@@ -1121,12 +1121,12 @@ function renderPlansTabsAndPanel() {
                 <table class="w-full text-left">
                     <thead class="bg-slate-100 text-slate-600 border-b border-slate-200 text-[11px] uppercase tracking-wider font-bold">
                         <tr>
-                            <th class="p-3.5 text-enging-navy">Alvo / Máquina Virtual / Comando</th>
-                            <th class="p-3.5 text-enging-navy">Endereço & Porta</th>
-                            <th class="p-3.5 text-enging-navy">Método</th>
-                            <th class="p-3.5 text-enging-navy">Delay</th>
-                            <th class="p-3.5 text-enging-navy">Último Teste</th>
-                            <th class="p-3.5 text-right text-enging-navy">Ações</th>
+                            <th class="p-3.5 text-slate-800">Alvo / Máquina Virtual / Comando</th>
+                            <th class="p-3.5 text-slate-800">Endereço & Porta</th>
+                            <th class="p-3.5 text-slate-800">Método</th>
+                            <th class="p-3.5 text-slate-800">Delay</th>
+                            <th class="p-3.5 text-slate-800">Último Teste</th>
+                            <th class="p-3.5 text-right text-slate-800">Ações</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
@@ -1180,43 +1180,43 @@ function openCreatePlanModal(planId = null) {
 
     if (!p) return;
 
-    swalEnging.fire({
+    swalTheme.fire({
         title: isEdit ? 'Editar Plano de Desligamento' : 'Criar Novo Plano de Desligamento',
         html: `
             <div class="text-left space-y-3.5 mt-2 font-sans">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Plano</label>
-                    <input id="swal-plan-name" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" placeholder="Ex: Estágio 1 - VMs Dev (60%)" value="${p.name}">
+                    <input id="swal-plan-name" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-orange-600" placeholder="Ex: Estágio 1 - VMs Dev (60%)" value="${p.name}">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Descrição / Finalidade</label>
-                    <input id="swal-plan-desc" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" placeholder="Ex: Desliga máquinas virtuais não críticas" value="${p.description || ''}">
+                    <input id="swal-plan-desc" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-orange-600" placeholder="Ex: Desliga máquinas virtuais não críticas" value="${p.description || ''}">
                 </div>
                 
                 <div class="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                     <div>
                         <div class="flex justify-between items-center mb-1">
-                            <label class="block text-xs font-bold text-enging-orange uppercase">Trigger Bateria</label>
-                            <span id="swal-plan-pct-val" class="text-xs font-mono font-black text-enging-orange">${p.trigger_battery_pct}%</span>
+                            <label class="block text-xs font-bold text-orange-600 uppercase">Trigger Bateria</label>
+                            <span id="swal-plan-pct-val" class="text-xs font-mono font-black text-orange-600">${p.trigger_battery_pct}%</span>
                         </div>
-                        <input id="swal-plan-pct" type="range" min="1" max="95" step="1" value="${p.trigger_battery_pct}" oninput="document.getElementById('swal-plan-pct-val').innerText = this.value + '%'" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-enging-orange">
+                        <input id="swal-plan-pct" type="range" min="1" max="95" step="1" value="${p.trigger_battery_pct}" oninput="document.getElementById('swal-plan-pct-val').innerText = this.value + '%'" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-600">
                         <p class="text-[10px] text-slate-500 mt-1">Dispara quando bateria ≤ X%</p>
                     </div>
 
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Carência (s)</label>
-                        <input id="swal-plan-grace" type="number" min="0" max="300" class="w-full px-3 py-1.5 text-xs font-mono rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" value="${p.grace_period_sec || 10}">
+                        <input id="swal-plan-grace" type="number" min="0" max="300" class="w-full px-3 py-1.5 text-xs font-mono rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-orange-600" value="${p.grace_period_sec || 10}">
                         <p class="text-[10px] text-slate-500 mt-1">Tempo antes de iniciar</p>
                     </div>
                 </div>
 
                 <div class="space-y-2 pt-1">
                     <div class="flex items-center gap-2">
-                        <input type="checkbox" id="swal-plan-req-batt" ${p.require_on_battery ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-enging-orange focus:ring-enging-orange">
+                        <input type="checkbox" id="swal-plan-req-batt" ${p.require_on_battery ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-600">
                         <label for="swal-plan-req-batt" class="text-xs text-slate-700 font-medium cursor-pointer">Exigir que a UPS esteja em modo de bateria (OB)</label>
                     </div>
                     <div class="flex items-center gap-2">
-                        <input type="checkbox" id="swal-plan-enabled" ${p.enabled ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-enging-orange focus:ring-enging-orange">
+                        <input type="checkbox" id="swal-plan-enabled" ${p.enabled ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-600">
                         <label for="swal-plan-enabled" class="text-xs text-slate-700 font-medium cursor-pointer">Plano Ativado para Disparo Automático</label>
                     </div>
                 </div>
@@ -1259,7 +1259,7 @@ function openCreatePlanModal(planId = null) {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: isEdit ? 'Plano Atualizado!' : 'Plano Criado!',
                         timer: 1500,
@@ -1271,14 +1271,14 @@ function openCreatePlanModal(planId = null) {
                     loadPlansData();
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao salvar plano: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao salvar plano: ' + e, 'error');
             }
         }
     });
 }
 
 function deletePlan(planId, planName) {
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Excluir Plano?',
         html: `Tem certeza que deseja excluir <strong>${planName}</strong> e todos os seus alvos?`,
         icon: 'warning',
@@ -1292,7 +1292,7 @@ function deletePlan(planId, planName) {
                 const res = await fetch(`/api/plans/${planId}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: 'Plano excluído!',
                         timer: 1500,
@@ -1302,7 +1302,7 @@ function deletePlan(planId, planName) {
                     loadPlansData();
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao excluir plano: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao excluir plano: ' + e, 'error');
             }
         }
     });
@@ -1331,19 +1331,19 @@ function openAddServerModal(planId, serverId = null) {
 
     if (!s) return;
 
-    swalEnging.fire({
+    swalTheme.fire({
         title: isEdit ? `Editar Alvo em [${plan.name}]` : `Adicionar Alvo a [${plan.name}]`,
         html: `
             <div class="text-left space-y-3.5 mt-2 font-sans">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Alvo / VM</label>
-                    <input id="swal-srv-name" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" placeholder="Ex: Proxmox VMs Dev (101 a 108), ESXi Node 01, Host Local" value="${s.name}">
+                    <input id="swal-srv-name" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-orange-600" placeholder="Ex: Proxmox VMs Dev (101 a 108), ESXi Node 01, Host Local" value="${s.name}">
                 </div>
                 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Método</label>
-                        <select id="swal-srv-method" onchange="toggleMethodFields()" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange">
+                        <select id="swal-srv-method" onchange="toggleMethodFields()" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-orange-600">
                             <option value="ssh" ${s.method === 'ssh' ? 'selected' : ''}>SSH (Linux / Proxmox / ESXi)</option>
                             <option value="windows_ssh" ${s.method === 'windows_ssh' ? 'selected' : ''}>SSH (Windows Server)</option>
                             <option value="local_command" ${s.method === 'local_command' ? 'selected' : ''}>Comando Local no Host NUT</option>
@@ -1352,7 +1352,7 @@ function openAddServerModal(planId, serverId = null) {
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Delay Sequencial (s)</label>
-                        <input id="swal-srv-delay" type="number" min="0" max="600" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" value="${s.delay_sec || 0}" placeholder="0">
+                        <input id="swal-srv-delay" type="number" min="0" max="600" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-orange-600" value="${s.delay_sec || 0}" placeholder="0">
                     </div>
                 </div>
 
@@ -1360,41 +1360,41 @@ function openAddServerModal(planId, serverId = null) {
                     <div class="grid grid-cols-3 gap-3">
                         <div class="col-span-2">
                             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Endereço IP / Hostname</label>
-                            <input id="swal-srv-host" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="10.255.255.10" value="${s.host}">
+                            <input id="swal-srv-host" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-orange-600" placeholder="10.255.255.10" value="${s.host}">
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Porta</label>
-                            <input id="swal-srv-port" type="number" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" value="${s.port || 22}">
+                            <input id="swal-srv-port" type="number" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-orange-600" value="${s.port || 22}">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Utilizador</label>
-                            <input id="swal-srv-user" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="root / admin" value="${s.username}">
+                            <input id="swal-srv-user" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-orange-600" placeholder="root / admin" value="${s.username}">
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Senha</label>
-                            <input id="swal-srv-pass" type="password" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="${isEdit ? '(Manter atual ou alterar)' : 'Senha'}" value="${s.password}">
+                            <input id="swal-srv-pass" type="password" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-orange-600" placeholder="${isEdit ? '(Manter atual ou alterar)' : 'Senha'}" value="${s.password}">
                         </div>
                     </div>
 
                     <div class="flex items-center gap-2">
-                        <input type="checkbox" id="swal-srv-sudo" ${s.sudo ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-enging-orange focus:ring-enging-orange">
+                        <input type="checkbox" id="swal-srv-sudo" ${s.sudo ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-600">
                         <label for="swal-srv-sudo" class="text-xs text-slate-700 font-medium cursor-pointer">Executar com sudo</label>
                     </div>
 
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Comando Personalizado de Desligamento</label>
-                        <input id="swal-srv-cmd" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" value="${s.custom_command}">
-                        <p class="text-[10px] text-slate-500 mt-1">Ex: <code class="text-enging-navy font-bold">qm shutdown 101</code> ou <code class="text-enging-navy font-bold">esxcli system shutdown poweroff</code></p>
+                        <input id="swal-srv-cmd" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-orange-600" value="${s.custom_command}">
+                        <p class="text-[10px] text-slate-500 mt-1">Ex: <code class="text-slate-800 font-bold">qm shutdown 101</code> ou <code class="text-slate-800 font-bold">esxcli system shutdown poweroff</code></p>
                     </div>
                 </div>
 
                 <div id="webhook-fields" class="space-y-3 hidden">
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase mb-1">URL do Webhook / API</label>
-                        <input id="swal-srv-webhook-url" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="https://api.proxmox:8006/..." value="${s.webhook_url || ''}">
+                        <input id="swal-srv-webhook-url" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-orange-600" placeholder="https://api.proxmox:8006/..." value="${s.webhook_url || ''}">
                     </div>
                 </div>
             </div>
@@ -1472,7 +1472,7 @@ function openAddServerModal(planId, serverId = null) {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: isEdit ? 'Alvo Atualizado' : 'Alvo Adicionado',
                         timer: 1500,
@@ -1481,14 +1481,14 @@ function openAddServerModal(planId, serverId = null) {
                     loadPlansData();
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao salvar alvo: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao salvar alvo: ' + e, 'error');
             }
         }
     });
 }
 
 function deleteServer(planId, serverId, serverName) {
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Remover Alvo?',
         html: `Tem certeza que deseja remover <strong>${serverName}</strong> deste plano?`,
         icon: 'warning',
@@ -1502,7 +1502,7 @@ function deleteServer(planId, serverId, serverName) {
                 const res = await fetch(`/api/plans/${planId}/server/${serverId}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: 'Removido com sucesso!',
                         timer: 1500,
@@ -1511,14 +1511,14 @@ function deleteServer(planId, serverId, serverName) {
                     loadPlansData();
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao remover alvo: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao remover alvo: ' + e, 'error');
             }
         }
     });
 }
 
 async function testServerConnection(planId, serverId) {
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Testando Conexão...',
         text: 'A estabelecer ligação de teste...',
         allowOutsideClick: false,
@@ -1530,7 +1530,7 @@ async function testServerConnection(planId, serverId) {
         const data = await res.json();
 
         if (data.success) {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'success',
                 title: 'Conexão Bem-Sucedida! 🟢',
                 html: `
@@ -1541,7 +1541,7 @@ async function testServerConnection(planId, serverId) {
                 `
             });
         } else {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'error',
                 title: 'Falha na Conexão! 🔴',
                 html: `<div class="text-left font-mono text-xs text-rose-700 font-bold p-2">${data.message}</div>`
@@ -1549,7 +1549,7 @@ async function testServerConnection(planId, serverId) {
         }
         loadPlansData();
     } catch (e) {
-        swalEnging.fire('Erro', 'Falha ao contactar API: ' + e, 'error');
+        swalTheme.fire('Erro', 'Falha ao contactar API: ' + e, 'error');
     }
 }
 
@@ -1559,7 +1559,7 @@ async function manualShutdownSingle(planId, serverId) {
     const s = (plan.servers || []).find(x => x.id === serverId);
     if (!s) return;
 
-    swalEnging.fire({
+    swalTheme.fire({
         title: `Desligar ${s.name}?`,
         html: `
             <p class="text-amber-800 font-bold mb-2">Atenção: Esta ação enviará a ordem imediata para:</p>
@@ -1576,7 +1576,7 @@ async function manualShutdownSingle(planId, serverId) {
     }).then(async (result) => {
         if (result.isConfirmed || result.isDenied) {
             const dry_run = result.isDenied;
-            swalEnging.fire({
+            swalTheme.fire({
                 title: dry_run ? 'Executando Simulação...' : 'Enviando Comando...',
                 allowOutsideClick: false,
                 didOpen: () => Swal.showLoading()
@@ -1590,23 +1590,23 @@ async function manualShutdownSingle(planId, serverId) {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: dry_run ? 'Simulação OK' : 'Comando Enviado',
                         text: data.message
                     });
                 } else {
-                    swalEnging.fire('Erro', data.message, 'error');
+                    swalTheme.fire('Erro', data.message, 'error');
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha na execução: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha na execução: ' + e, 'error');
             }
         }
     });
 }
 
 function runPlanDryRun(planId) {
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Simular Execução deste Plano?',
         text: 'Isto executará o ciclo de desligamento deste plano em Modo de Simulação (Dry-Run), respeitando a contagem regressiva e os atrasos sem desligar máquinas reais.',
         icon: 'question',
@@ -1623,7 +1623,7 @@ function runPlanDryRun(planId) {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'info',
                         title: 'Simulação Iniciada!',
                         text: 'Acompanhe o banner superior para ver o progresso.',
@@ -1632,14 +1632,14 @@ function runPlanDryRun(planId) {
                     });
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao iniciar simulação: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao iniciar simulação: ' + e, 'error');
             }
         }
     });
 }
 
 function runPlanNow(planId, planName) {
-    swalEnging.fire({
+    swalTheme.fire({
         title: `Executar Plano [${planName}] Agora?`,
         html: `
             <p class="text-rose-700 font-bold mb-2">Atenção: Todos os servidores e VMs configurados neste plano serão desligados sequencialmente!</p>
@@ -1659,7 +1659,7 @@ function runPlanNow(planId, planName) {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'warning',
                         title: 'Execução Iniciada!',
                         text: 'A contagem regressiva e os desligamentos foram acionados.',
@@ -1668,7 +1668,7 @@ function runPlanNow(planId, planName) {
                     });
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao acionar plano: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao acionar plano: ' + e, 'error');
             }
         }
     });
@@ -1679,7 +1679,7 @@ async function cancelPlanExecution(planId) {
         const res = await fetch(`/api/plans/${planId}/cancel`, { method: 'POST' });
         const data = await res.json();
         if (data.success) {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'success',
                 title: 'Cancelado!',
                 text: 'A execução do plano foi abortada.',
@@ -1706,7 +1706,7 @@ async function openLogsModal() {
                     </span>
                     <div class="flex-1">
                         <div class="flex justify-between items-center text-[11px]">
-                            <strong class="text-enging-navy font-bold">${l.server || 'Sistema'}</strong>
+                            <strong class="text-slate-800 font-bold">${l.server || 'Sistema'}</strong>
                             <span class="text-slate-400 font-mono">${l.formatted_time}</span>
                         </div>
                         <p class="text-xs text-slate-700 mt-0.5">${l.message}</p>
@@ -1714,7 +1714,7 @@ async function openLogsModal() {
                 </div>
             `).join('');
 
-        swalEnging.fire({
+        swalTheme.fire({
             title: 'Histórico & Logs de Auditoria',
             html: `
                 <div class="text-left space-y-2 max-h-96 overflow-y-auto pr-1">
@@ -1726,7 +1726,7 @@ async function openLogsModal() {
             didOpen: () => lucide.createIcons()
         });
     } catch (e) {
-        swalEnging.fire('Erro', 'Falha ao buscar logs: ' + e, 'error');
+        swalTheme.fire('Erro', 'Falha ao buscar logs: ' + e, 'error');
     }
 }
 
@@ -1767,9 +1767,9 @@ function renderAlertsUI() {
             rulesListEl.innerHTML = `
                 <div class="col-span-2 p-10 text-center text-slate-500 rounded-2xl bg-white border border-slate-200 shadow-sm">
                     <i data-lucide="bell-off" class="w-12 h-12 mx-auto mb-3 text-slate-400"></i>
-                    <h3 class="text-base font-bold text-enging-navy">Nenhuma regra de alerta criada</h3>
+                    <h3 class="text-base font-bold text-slate-800">Nenhuma regra de alerta criada</h3>
                     <p class="text-xs text-slate-500 mt-1 mb-4">Crie regras para ser avisado quando faltar energia, acionar baterias ou ocorrer sobrecarga.</p>
-                    <button onclick="openCreateAlertRuleModal()" class="px-4 py-2.5 rounded-xl bg-enging-orange hover:bg-enging-orange-hover text-white font-bold text-xs shadow-md shadow-enging-orange/20">
+                    <button onclick="openCreateAlertRuleModal()" class="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-600/20">
                         + Criar Nova Regra de Alerta
                     </button>
                 </div>
@@ -1784,7 +1784,7 @@ function renderAlertsUI() {
                 const channels = r.channels || [];
                 const chBadges = channels.map(ch => {
                     if (ch === 'whatsapp') return `<span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">WhatsApp</span>`;
-                    if (ch === 'email') return `<span class="px-2 py-0.5 rounded-md bg-blue-50 text-enging-blue border border-blue-200 text-[10px] font-bold">Email</span>`;
+                    if (ch === 'email') return `<span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-bold">Email</span>`;
                     if (ch === 'sms') return `<span class="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold">SMS</span>`;
                     if (ch === 'webhook') return `<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">Webhook</span>`;
                     return '';
@@ -1803,12 +1803,12 @@ function renderAlertsUI() {
                             <div class="flex items-start justify-between gap-3">
                                 <div>
                                     <div class="flex items-center gap-2">
-                                        <h3 class="text-sm font-bold text-enging-navy">${r.name}</h3>
+                                        <h3 class="text-sm font-bold text-slate-800">${r.name}</h3>
                                         <span class="w-2 h-2 rounded-full ${r.enabled ? 'bg-emerald-500' : 'bg-slate-300'}"></span>
                                     </div>
                                     <p class="text-xs text-slate-500 mt-0.5">${r.description || 'Sem descrição adicional'}</p>
                                 </div>
-                                <span class="px-2.5 py-1 rounded-xl bg-orange-50 text-enging-orange border border-orange-200 text-[11px] font-bold whitespace-nowrap">
+                                <span class="px-2.5 py-1 rounded-xl bg-orange-50 text-orange-600 border border-orange-200 text-[11px] font-bold whitespace-nowrap">
                                     ${triggerDesc}
                                 </span>
                             </div>
@@ -1851,7 +1851,7 @@ function renderAlertsUI() {
         } else {
             recsTbody.innerHTML = recipients.map(rec => `
                 <tr class="hover:bg-slate-50 transition text-xs">
-                    <td class="p-3.5 font-bold text-enging-navy">${rec.name}</td>
+                    <td class="p-3.5 font-bold text-slate-800">${rec.name}</td>
                     <td class="p-3.5 font-mono text-slate-600">${rec.email || '-'}</td>
                     <td class="p-3.5 font-mono text-emerald-700 font-medium">${rec.phone_whatsapp || '-'}</td>
                     <td class="p-3.5 font-mono text-purple-700 font-medium">${rec.phone_sms || '-'}</td>
@@ -1862,7 +1862,7 @@ function renderAlertsUI() {
                         </span>
                     </td>
                     <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
-                        <button onclick="testRecipientAlert('${rec.id}', '${rec.name}')" title="Enviar Notificação de Teste" class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-enging-orange transition">
+                        <button onclick="testRecipientAlert('${rec.id}', '${rec.name}')" title="Enviar Notificação de Teste" class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-orange-600 transition">
                             <i data-lucide="send" class="w-3.5 h-3.5"></i>
                         </button>
                         <button onclick="openAddRecipientModal('${rec.id}')" title="Editar" class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
@@ -1891,7 +1891,7 @@ function renderAlertsUI() {
                         </span>
                         <div>
                             <div class="flex items-center gap-2">
-                                <strong class="text-enging-navy">${l.alert_name}</strong>
+                                <strong class="text-slate-800">${l.alert_name}</strong>
                                 <span class="px-1.5 py-0.2 rounded bg-slate-200 text-slate-700 text-[10px] uppercase font-bold font-mono">${l.channel}</span>
                                 <span class="text-slate-500 font-medium">→ ${l.recipient_name}</span>
                             </div>
@@ -1916,7 +1916,7 @@ function renderAlertsUI() {
 
 function openCreateAlertRuleModal(ruleId = null) {
     const isEdit = !!ruleId;
-    const defaultTemplate = `🚨 *ALERTA ENGING UPS SYSTEM* 🚨\n━━━━━━━━━━━━━━━━━━━━━━\n📌 *Evento:* {evento}\n⚠️ *Detalhe:* {detalhe}\n🕒 *Hora:* {hora}\n━━━━━━━━━━━━━━━━━━━━━━\n🔋 *Bateria:* {bateria} ({tensao_bat})\n⚡ *Entrada AC:* {tensao_in} ({freq_in})\n🔌 *Saída UPS:* {tensao_out} | Carga: {carga} ({potencia})\n📊 *Modo:* {modo}\n🖥️ *Servidor:* {servidor}\n━━━━━━━━━━━━━━━━━━━━━━\nPainel: {painel_url}`;
+    const defaultTemplate = `🚨 *ALERTA NUT PANEL SYSTEM* 🚨\n━━━━━━━━━━━━━━━━━━━━━━\n📌 *Evento:* {evento}\n⚠️ *Detalhe:* {detalhe}\n🕒 *Hora:* {hora}\n━━━━━━━━━━━━━━━━━━━━━━\n🔋 *Bateria:* {bateria} ({tensao_bat})\n⚡ *Entrada AC:* {tensao_in} ({freq_in})\n🔌 *Saída UPS:* {tensao_out} | Carga: {carga} ({potencia})\n📊 *Modo:* {modo}\n🖥️ *Servidor:* {servidor}\n━━━━━━━━━━━━━━━━━━━━━━\nPainel: {painel_url}`;
 
     const r = isEdit ? (allAlertsData.rules || []).find(x => x.id === ruleId) : {
         id: '',
@@ -1942,7 +1942,7 @@ function openCreateAlertRuleModal(ruleId = null) {
         const isChecked = (r.recipient_ids || []).includes(rec.id);
         return `
             <label class="flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 cursor-pointer text-xs hover:bg-slate-50 transition">
-                <input type="checkbox" class="swal-rec-chk w-4 h-4 rounded border-slate-300 text-enging-orange focus:ring-enging-orange" value="${rec.id}" ${isChecked ? 'checked' : ''}>
+                <input type="checkbox" class="swal-rec-chk w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-600" value="${rec.id}" ${isChecked ? 'checked' : ''}>
                 <span class="font-bold text-slate-800">${rec.name}</span>
                 <span class="text-[10px] text-slate-400 font-mono">(${rec.email || rec.phone_whatsapp || 'Webhook'})</span>
             </label>
@@ -1956,9 +1956,9 @@ function openCreateAlertRuleModal(ruleId = null) {
     const chGoogleChat = (r.channels || []).includes('google_chat') ? 'checked' : '';
     const chWebhook = (r.channels || []).includes('webhook') ? 'checked' : '';
 
-    const sessionName = currentSessionConfig.name || 'Enging UPS Notifier ⚡';
+    const sessionName = currentSessionConfig.name || 'NUT Panel Notifier ⚡';
 
-    swalEnging.fire({
+    swalTheme.fire({
         title: isEdit ? 'Editar Regra de Alerta' : 'Criar Nova Regra de Alerta',
         html: `
             <div class="text-left space-y-4 mt-2 font-sans text-xs">
@@ -1967,12 +1967,12 @@ function openCreateAlertRuleModal(ruleId = null) {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                         <label class="block font-bold text-slate-700 uppercase mb-1">Nome da Regra</label>
-                        <input id="swal-rule-name" oninput="window.updateAlertRuleChatPreview()" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-enging-orange" placeholder="Ex: Falta de Luz - Envio TI" value="${r.name || 'Falta de Energia AC'}">
+                        <input id="swal-rule-name" oninput="window.updateAlertRuleChatPreview()" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-orange-600" placeholder="Ex: Falta de Luz - Envio TI" value="${r.name || 'Falta de Energia AC'}">
                     </div>
 
                     <div>
                         <label class="block font-bold text-slate-700 uppercase mb-1">Tipo de Gatilho / Trigger</label>
-                        <select id="swal-rule-trigger" onchange="window.toggleTriggerThresholds(); window.updateAlertRuleChatPreview();" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange font-medium">
+                        <select id="swal-rule-trigger" onchange="window.toggleTriggerThresholds(); window.updateAlertRuleChatPreview();" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-orange-600 font-medium">
                             <option value="on_battery" ${r.trigger_type === 'on_battery' ? 'selected' : ''}>🚨 Falta de Energia Elétrica AC (UPS em Bateria)</option>
                             <option value="power_restored" ${r.trigger_type === 'power_restored' ? 'selected' : ''}>🟢 Restabelecimento de Energia Elétrica AC (Retorno ao modo Online)</option>
                             <option value="battery_level_low" ${r.trigger_type === 'battery_level_low' ? 'selected' : ''}>🔋 Nível de Bateria Baixo / Crítico (≤ X %)</option>
@@ -1986,7 +1986,7 @@ function openCreateAlertRuleModal(ruleId = null) {
                 <!-- 2. Parâmetros do Gatilho -->
                 <div id="swal-thresh-box" class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                     <div id="thresh-val-group">
-                        <label id="thresh-val-label" class="block font-bold text-enging-orange uppercase mb-1">Limite Numérico (%)</label>
+                        <label id="thresh-val-label" class="block font-bold text-orange-600 uppercase mb-1">Limite Numérico (%)</label>
                         <input id="swal-rule-thresh" oninput="window.updateAlertRuleChatPreview()" type="number" step="1" class="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono" value="${r.threshold_val || 30}">
                     </div>
                 </div>
@@ -2064,9 +2064,9 @@ function openCreateAlertRuleModal(ruleId = null) {
                     <div class="p-2 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
                         <div class="flex items-center justify-between gap-2 flex-wrap text-[11px]">
                             <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                                <i data-lucide="tag" class="w-3 h-3 text-enging-orange"></i> Inserir Variáveis:
+                                <i data-lucide="tag" class="w-3 h-3 text-orange-600"></i> Inserir Variáveis:
                             </span>
-                            <button type="button" onclick="window.resetDefaultMsgTemplate()" class="text-[10px] text-enging-orange hover:underline font-bold flex items-center gap-1">
+                            <button type="button" onclick="window.resetDefaultMsgTemplate()" class="text-[10px] text-orange-600 hover:underline font-bold flex items-center gap-1">
                                 <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Restaurar Modelo Padrão
                             </button>
                         </div>
@@ -2116,14 +2116,14 @@ function openCreateAlertRuleModal(ruleId = null) {
                         <div class="bg-[#005c4b] text-white px-3 py-2 flex items-center justify-between shadow-xs select-none">
                             <div class="flex items-center gap-2">
                                 <div class="w-6 h-6 rounded-full bg-emerald-700 flex items-center justify-center text-white text-xs font-bold shadow-xs">
-                                    <i data-lucide="zap" class="w-3.5 h-3.5 text-enging-orange"></i>
+                                    <i data-lucide="zap" class="w-3.5 h-3.5 text-orange-600"></i>
                                 </div>
                                 <div>
                                     <div class="font-bold text-xs leading-none text-white">${sessionName}</div>
                                     <div class="text-[9px] text-emerald-200 font-mono">Disparo Automático de Alerta</div>
                                 </div>
                             </div>
-                            <span class="text-[10px] font-mono text-emerald-200">Enging UPS Bot</span>
+                            <span class="text-[10px] font-mono text-emerald-200">NUT Panel Bot</span>
                         </div>
 
                         <!-- Chat Messages Feed / WhatsApp Bubble -->
@@ -2132,7 +2132,7 @@ function openCreateAlertRuleModal(ruleId = null) {
                                 <div class="max-w-[95%] bg-[#d9fdd3] rounded-2xl rounded-tr-xs p-3 shadow-xs border border-[#c6f5be] space-y-1 text-left">
                                     
                                     <div class="text-[10px] text-emerald-800 font-bold flex items-center justify-between gap-2 border-b border-emerald-200/60 pb-1 mb-1">
-                                        <span>⚡ ENGING NOTIFICATION SYSTEM</span>
+                                        <span>⚡ BRAND NOTIFICATION SYSTEM</span>
                                         <span class="font-mono text-[9px] text-slate-500">Alerta Oficial</span>
                                     </div>
 
@@ -2154,7 +2154,7 @@ function openCreateAlertRuleModal(ruleId = null) {
 
                 <div class="pt-1">
                     <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="swal-rule-enabled" ${r.enabled ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-enging-orange focus:ring-enging-orange">
+                        <input type="checkbox" id="swal-rule-enabled" ${r.enabled ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-600">
                         <span class="font-bold text-slate-800">Regra Ativada para Monitorização Contínua</span>
                     </label>
                 </div>
@@ -2371,7 +2371,7 @@ function openCreateAlertRuleModal(ruleId = null) {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: isEdit ? 'Regra Atualizada!' : 'Regra Criada!',
                         timer: 1500,
@@ -2380,14 +2380,14 @@ function openCreateAlertRuleModal(ruleId = null) {
                     loadAlertsData();
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao salvar regra de alerta: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao salvar regra de alerta: ' + e, 'error');
             }
         }
     });
 }
 
 function deleteAlertRule(ruleId, ruleName) {
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Excluir Regra de Alerta?',
         html: `Deseja excluir a regra <strong>${ruleName}</strong>?`,
         icon: 'warning',
@@ -2401,7 +2401,7 @@ function deleteAlertRule(ruleId, ruleName) {
                 const res = await fetch(`/api/alerts/rule/${ruleId}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: 'Regra excluída!',
                         timer: 1500,
@@ -2410,7 +2410,7 @@ function deleteAlertRule(ruleId, ruleName) {
                     loadAlertsData();
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao excluir regra: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao excluir regra: ' + e, 'error');
             }
         }
     });
@@ -2433,34 +2433,34 @@ function openAddRecipientModal(recipientId = null) {
 
     if (!rec) return;
 
-    swalEnging.fire({
+    swalTheme.fire({
         title: isEdit ? 'Editar Contato' : 'Adicionar Novo Contato',
         html: `
             <div class="text-left space-y-3 mt-2 font-sans text-xs">
                 <div>
                     <label class="block font-bold text-slate-700 uppercase mb-1">Nome Completo / Função</label>
-                    <input id="swal-rec-name" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" placeholder="Ex: André Silva (Piquete TI)" value="${rec.name}">
+                    <input id="swal-rec-name" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-orange-600" placeholder="Ex: André Silva (Piquete TI)" value="${rec.name}">
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block font-bold text-slate-700 uppercase mb-1">Email</label>
-                        <input id="swal-rec-email" type="email" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="nome@enging.pt" value="${rec.email || ''}">
+                        <input id="swal-rec-email" type="email" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-orange-600" placeholder="nome@brand.pt" value="${rec.email || ''}">
                     </div>
                     <div>
                         <label class="block font-bold text-slate-700 uppercase mb-1">WhatsApp (com DDI)</label>
-                        <input id="swal-rec-wa" type="text" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="+351912345678" value="${rec.phone_whatsapp || ''}">
+                        <input id="swal-rec-wa" type="text" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-orange-600" placeholder="+351912345678" value="${rec.phone_whatsapp || ''}">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block font-bold text-slate-700 uppercase mb-1">SMS (com DDI)</label>
-                        <input id="swal-rec-sms" type="text" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="+351912345678" value="${rec.phone_sms || ''}">
+                        <input id="swal-rec-sms" type="text" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-orange-600" placeholder="+351912345678" value="${rec.phone_sms || ''}">
                     </div>
                     <div>
                         <label class="block font-bold text-slate-700 uppercase mb-1">Webhook Pessoal Genérico (Opcional)</label>
-                        <input id="swal-rec-wh" type="text" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="https://webhook.site/..." value="${rec.webhook_url || ''}">
+                        <input id="swal-rec-wh" type="text" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-orange-600" placeholder="https://webhook.site/..." value="${rec.webhook_url || ''}">
                     </div>
                 </div>
 
@@ -2469,7 +2469,7 @@ function openAddRecipientModal(recipientId = null) {
                         <label class="block font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
                             <svg class="w-3.5 h-3.5" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#F25022"/><rect x="11" y="1" width="9" height="9" fill="#7FBA00"/><rect x="1" y="11" width="9" height="9" fill="#00A4EF"/><rect x="11" y="11" width="9" height="9" fill="#FFB900"/></svg> Teams Webhook (Opcional)
                         </label>
-                        <input id="swal-rec-teams" type="text" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-blue-600" placeholder="https://enging.webhook.office.com/..." value="${rec.teams_webhook || ''}">
+                        <input id="swal-rec-teams" type="text" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-blue-600" placeholder="https://webhook.office.com/..." value="${rec.teams_webhook || ''}">
                     </div>
                     <div>
                         <label class="block font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
@@ -2481,7 +2481,7 @@ function openAddRecipientModal(recipientId = null) {
 
                 <div class="pt-1">
                     <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="swal-rec-enabled" ${rec.enabled ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-enging-orange focus:ring-enging-orange">
+                        <input type="checkbox" id="swal-rec-enabled" ${rec.enabled ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-600">
                         <span class="font-bold text-slate-800">Contato Ativo para Recebimento de Notificações</span>
                     </label>
                 </div>
@@ -2529,7 +2529,7 @@ function openAddRecipientModal(recipientId = null) {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: isEdit ? 'Contato Atualizado!' : 'Contato Adicionado!',
                         timer: 1500,
@@ -2538,14 +2538,14 @@ function openAddRecipientModal(recipientId = null) {
                     loadAlertsData();
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao salvar contato: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao salvar contato: ' + e, 'error');
             }
         }
     });
 }
 
 function deleteRecipient(recId, recName) {
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Remover Contato?',
         html: `Tem certeza que deseja remover <strong>${recName}</strong> da lista de contatos?`,
         icon: 'warning',
@@ -2559,7 +2559,7 @@ function deleteRecipient(recId, recName) {
                 const res = await fetch(`/api/alerts/recipient/${recId}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: 'Contato removido!',
                         timer: 1500,
@@ -2568,14 +2568,14 @@ function deleteRecipient(recId, recName) {
                     loadAlertsData();
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao remover contato: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao remover contato: ' + e, 'error');
             }
         }
     });
 }
 
 function testRecipientAlert(recId, recName) {
-    swalEnging.fire({
+    swalTheme.fire({
         title: `Testar Envio para ${recName}`,
         html: `
             <p class="text-xs text-slate-600 mb-3">Escolha por qual canal deseja disparar a notificação de teste:</p>
@@ -2636,7 +2636,7 @@ function openChannelSettingsModal() {
     const googleChat = s.google_chat || {};
     const wh = s.webhook || {};
 
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Configurações Globais de Gateways',
         html: `
             <div class="text-left space-y-4 mt-2 font-sans text-xs max-h-[440px] overflow-y-auto pr-1">
@@ -2644,7 +2644,7 @@ function openChannelSettingsModal() {
                 <!-- 1. SMTP / Email -->
                 <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
                     <div class="flex items-center justify-between">
-                        <span class="font-bold text-enging-navy uppercase flex items-center gap-1.5"><i data-lucide="mail" class="w-4 h-4 text-blue-600"></i> Email (SMTP)</span>
+                        <span class="font-bold text-slate-800 uppercase flex items-center gap-1.5"><i data-lucide="mail" class="w-4 h-4 text-blue-600"></i> Email (SMTP)</span>
                         <label class="flex items-center gap-1 cursor-pointer">
                             <input type="checkbox" id="smtp-enabled" ${smtp.enabled ? 'checked' : ''} class="w-4 h-4 rounded text-blue-600">
                             <span class="font-bold text-slate-700">Ativado</span>
@@ -2675,7 +2675,7 @@ function openChannelSettingsModal() {
                 <!-- 2. WhatsApp Gateway -->
                 <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
                     <div class="flex items-center justify-between">
-                        <span class="font-bold text-enging-navy uppercase flex items-center gap-1.5"><i data-lucide="message-square" class="w-4 h-4 text-emerald-600"></i> WhatsApp Gateway / Webhook</span>
+                        <span class="font-bold text-slate-800 uppercase flex items-center gap-1.5"><i data-lucide="message-square" class="w-4 h-4 text-emerald-600"></i> WhatsApp Gateway / Webhook</span>
                         <label class="flex items-center gap-1 cursor-pointer">
                             <input type="checkbox" id="wa-enabled" ${wa.enabled ? 'checked' : ''} class="w-4 h-4 rounded text-emerald-600">
                             <span class="font-bold text-slate-700">Ativado</span>
@@ -2690,7 +2690,7 @@ function openChannelSettingsModal() {
                 <!-- 3. SMS Gateway -->
                 <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
                     <div class="flex items-center justify-between">
-                        <span class="font-bold text-enging-navy uppercase flex items-center gap-1.5"><i data-lucide="smartphone" class="w-4 h-4 text-purple-600"></i> SMS Gateway HTTP API</span>
+                        <span class="font-bold text-slate-800 uppercase flex items-center gap-1.5"><i data-lucide="smartphone" class="w-4 h-4 text-purple-600"></i> SMS Gateway HTTP API</span>
                         <label class="flex items-center gap-1 cursor-pointer">
                             <input type="checkbox" id="sms-enabled" ${sms.enabled ? 'checked' : ''} class="w-4 h-4 rounded text-purple-600">
                             <span class="font-bold text-slate-700">Ativado</span>
@@ -2705,7 +2705,7 @@ function openChannelSettingsModal() {
                 <!-- 4. Microsoft Teams Webhook -->
                 <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
                     <div class="flex items-center justify-between">
-                        <span class="font-bold text-enging-navy uppercase flex items-center gap-1.5">
+                        <span class="font-bold text-slate-800 uppercase flex items-center gap-1.5">
                             <svg class="w-4 h-4" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#F25022"/><rect x="11" y="1" width="9" height="9" fill="#7FBA00"/><rect x="1" y="11" width="9" height="9" fill="#00A4EF"/><rect x="11" y="11" width="9" height="9" fill="#FFB900"/></svg> Microsoft Teams Webhook
                         </span>
                         <label class="flex items-center gap-1 cursor-pointer">
@@ -2715,14 +2715,14 @@ function openChannelSettingsModal() {
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-slate-500">URL do Webhook Teams (Office 365 / Power Automate)</label>
-                        <input id="teams-url" class="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 font-mono text-xs" placeholder="https://enging.webhook.office.com/..." value="${teams.webhook_url || ''}">
+                        <input id="teams-url" class="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 font-mono text-xs" placeholder="https://webhook.office.com/..." value="${teams.webhook_url || ''}">
                     </div>
                 </div>
 
                 <!-- 5. Google Chat Webhook -->
                 <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
                     <div class="flex items-center justify-between">
-                        <span class="font-bold text-enging-navy uppercase flex items-center gap-1.5">
+                        <span class="font-bold text-slate-800 uppercase flex items-center gap-1.5">
                             <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/></svg> Google Chat Webhook
                         </span>
                         <label class="flex items-center gap-1 cursor-pointer">
@@ -2739,7 +2739,7 @@ function openChannelSettingsModal() {
                 <!-- 6. Webhook Genérico & SIEM -->
                 <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
                     <div class="flex items-center justify-between">
-                        <span class="font-bold text-enging-navy uppercase flex items-center gap-1.5"><i data-lucide="webhook" class="w-4 h-4 text-amber-600"></i> Webhook Genérico & SIEM (Zabbix/Discord/Slack/n8n)</span>
+                        <span class="font-bold text-slate-800 uppercase flex items-center gap-1.5"><i data-lucide="webhook" class="w-4 h-4 text-amber-600"></i> Webhook Genérico & SIEM (Zabbix/Discord/Slack/n8n)</span>
                         <label class="flex items-center gap-1 cursor-pointer">
                             <input type="checkbox" id="wh-enabled" ${wh.enabled !== false ? 'checked' : ''} class="w-4 h-4 rounded text-amber-600">
                             <span class="font-bold text-slate-700">Ativado</span>
@@ -2747,7 +2747,7 @@ function openChannelSettingsModal() {
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-slate-500">URL Padrão de Webhook</label>
-                        <input id="wh-url" class="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 font-mono text-xs" placeholder="https://zabbix.enging.pt/api/webhook/ups" value="${wh.default_url || ''}">
+                        <input id="wh-url" class="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 font-mono text-xs" placeholder="https://zabbix.brand.pt/api/webhook/ups" value="${wh.default_url || ''}">
                     </div>
                 </div>
 
@@ -2768,8 +2768,8 @@ function openChannelSettingsModal() {
                     use_tls: true,
                     username: document.getElementById('smtp-user').value.trim(),
                     password: document.getElementById('smtp-pass').value,
-                    from_email: document.getElementById('smtp-user').value.trim() || 'ups-alerts@enging.pt',
-                    from_name: 'Enging UPS System'
+                    from_email: document.getElementById('smtp-user').value.trim() || 'ups-alerts@example.com',
+                    from_name: 'NUT Panel'
                 },
                 whatsapp: {
                     enabled: document.getElementById('wa-enabled').checked,
@@ -2805,7 +2805,7 @@ function openChannelSettingsModal() {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: 'Configurações Salvas!',
                         timer: 1500,
@@ -2814,7 +2814,7 @@ function openChannelSettingsModal() {
                     loadAlertsData();
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao salvar configurações: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao salvar configurações: ' + e, 'error');
             }
         }
     });
@@ -2854,7 +2854,7 @@ function populateNutConfigForm() {
     if (fHost) fHost.value = nut.host || '10.255.255.28';
     if (fPort) fPort.value = nut.port || 3493;
     if (fUps) fUps.value = nut.ups_name || 'ups';
-    if (fUser) fUser.value = nut.username || 'enging';
+    if (fUser) fUser.value = nut.username || 'brand';
     if (fPoll) fPoll.value = nut.poll_interval || 2.0;
     if (fTimeout) fTimeout.value = nut.timeout || 5.0;
 
@@ -2892,7 +2892,7 @@ async function saveNutConfig(e) {
         });
         const data = await res.json();
         if (data.success) {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'success',
                 title: 'Parâmetros NUT Atualizados!',
                 timer: 1500,
@@ -2901,7 +2901,7 @@ async function saveNutConfig(e) {
             loadConnectionsData();
         }
     } catch (err) {
-        swalEnging.fire('Erro', 'Falha ao guardar configuração NUT: ' + err, 'error');
+        swalTheme.fire('Erro', 'Falha ao guardar configuração NUT: ' + err, 'error');
     }
 }
 
@@ -2909,14 +2909,14 @@ async function testNutConnectionLive() {
     const host = document.getElementById('nut-conf-host') ? document.getElementById('nut-conf-host').value.trim() : '10.255.255.28';
     const port = document.getElementById('nut-conf-port') ? parseInt(document.getElementById('nut-conf-port').value) : 3493;
     const upsName = document.getElementById('nut-conf-upsname') ? document.getElementById('nut-conf-upsname').value.trim() : 'ups';
-    const user = document.getElementById('nut-conf-user') ? document.getElementById('nut-conf-user').value.trim() : 'enging';
+    const user = document.getElementById('nut-conf-user') ? document.getElementById('nut-conf-user').value.trim() : 'brand';
     const pass = document.getElementById('nut-conf-pass') ? document.getElementById('nut-conf-pass').value : '';
 
     const resBox = document.getElementById('nut-test-result-box');
     const resMsg = document.getElementById('nut-test-result-msg');
     const resSub = document.getElementById('nut-test-result-sub');
 
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'A testar Socket NUT...',
         text: `Conectando a ${host}:${port}...`,
         allowOutsideClick: false,
@@ -2932,7 +2932,7 @@ async function testNutConnectionLive() {
         const data = await res.json();
 
         if (data.success) {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'success',
                 title: 'Socket NUT Conectado!',
                 html: `
@@ -2950,7 +2950,7 @@ async function testNutConnectionLive() {
                 resBox.classList.remove('hidden');
             }
         } else {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'error',
                 title: 'Falha na Ligação Socket',
                 text: data.message || data.error
@@ -2964,7 +2964,7 @@ async function testNutConnectionLive() {
         }
         loadConnectionsData();
     } catch (err) {
-        swalEnging.fire('Erro', 'Falha ao executar teste: ' + err, 'error');
+        swalTheme.fire('Erro', 'Falha ao executar teste: ' + err, 'error');
     }
 }
 
@@ -3009,7 +3009,7 @@ function renderProxmoxTable() {
                 <td class="p-3.5 font-mono text-slate-700 text-[11px] font-bold">${userLabel}</td>
                 <td class="p-3.5">${statusBadge}</td>
                 <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
-                    <button onclick="testProxmox('${s.id}')" title="Testar Conexão SSH" class="px-2.5 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-enging-orange font-bold text-[11px] border border-orange-200 transition inline-flex items-center gap-1 shadow-xs">
+                    <button onclick="testProxmox('${s.id}')" title="Testar Conexão SSH" class="px-2.5 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 font-bold text-[11px] border border-orange-200 transition inline-flex items-center gap-1 shadow-xs">
                         <i data-lucide="play" class="w-3 h-3"></i> Testar SSH
                     </button>
                     <button onclick="openProxmoxModal('${s.id}')" title="Editar" class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition inline-flex items-center shadow-xs">
@@ -3030,7 +3030,7 @@ function openProxmoxModal(serverId = null) {
     const s = serverId ? (allConnectionsData.proxmox_servers || []).find(x => x.id === serverId) : null;
     const isEdit = !!s;
 
-    swalEnging.fire({
+    swalTheme.fire({
         title: isEdit ? 'Editar Nó Proxmox VE (SSH)' : 'Adicionar Nó Proxmox VE (SSH)',
         html: `
             <div class="text-left space-y-3 font-sans text-xs">
@@ -3116,7 +3116,7 @@ function openProxmoxModal(serverId = null) {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: 'Nó Proxmox Gravado com Sucesso!',
                         timer: 1200,
@@ -3125,7 +3125,7 @@ function openProxmoxModal(serverId = null) {
                     loadConnectionsData();
                 }
             } catch (err) {
-                swalEnging.fire('Erro', 'Falha ao gravar nó Proxmox: ' + err, 'error');
+                swalTheme.fire('Erro', 'Falha ao gravar nó Proxmox: ' + err, 'error');
             }
         }
     });
@@ -3145,7 +3145,7 @@ function togglePveAuthFields() {
 }
 
 async function deleteProxmox(id) {
-    const confirm = await swalEnging.fire({
+    const confirm = await swalTheme.fire({
         title: 'Eliminar Nó Proxmox?',
         text: 'Esta ação não poderá ser desfeita.',
         icon: 'warning',
@@ -3158,13 +3158,13 @@ async function deleteProxmox(id) {
             await fetch(`/api/connections/proxmox/${id}`, { method: 'DELETE' });
             loadConnectionsData();
         } catch (e) {
-            swalEnging.fire('Erro', 'Falha ao eliminar: ' + e, 'error');
+            swalTheme.fire('Erro', 'Falha ao eliminar: ' + e, 'error');
         }
     }
 }
 
 async function testProxmox(id) {
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Testando Conexão SSH ao Proxmox...',
         text: 'Conectando via SSH e consultando versão...',
         allowOutsideClick: false,
@@ -3175,7 +3175,7 @@ async function testProxmox(id) {
         const res = await fetch(`/api/connections/proxmox/test/${id}`, { method: 'POST' });
         const data = await res.json();
         if (data.success) {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'success',
                 title: 'Conexão SSH Proxmox OK!',
                 html: `
@@ -3188,7 +3188,7 @@ async function testProxmox(id) {
                 `
             });
         } else {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'error',
                 title: 'Falha na Conexão SSH Proxmox',
                 text: data.message || data.error
@@ -3196,7 +3196,7 @@ async function testProxmox(id) {
         }
         loadConnectionsData();
     } catch (e) {
-        swalEnging.fire('Erro', 'Falha ao testar conexão SSH: ' + e, 'error');
+        swalTheme.fire('Erro', 'Falha ao testar conexão SSH: ' + e, 'error');
     }
 }
 
@@ -3262,7 +3262,7 @@ function openVmwareModal(serverId = null) {
     const s = serverId ? (allConnectionsData.vmware_servers || []).find(x => x.id === serverId) : null;
     const isEdit = !!s;
 
-    swalEnging.fire({
+    swalTheme.fire({
         title: isEdit ? 'Editar Servidor VMware' : 'Adicionar Servidor VMware ESXi / vCenter',
         html: `
             <div class="text-left space-y-3 font-sans text-xs">
@@ -3349,7 +3349,7 @@ function openVmwareModal(serverId = null) {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: 'Servidor VMware Gravado!',
                         timer: 1200,
@@ -3358,14 +3358,14 @@ function openVmwareModal(serverId = null) {
                     loadConnectionsData();
                 }
             } catch (err) {
-                swalEnging.fire('Erro', 'Falha ao gravar servidor: ' + err, 'error');
+                swalTheme.fire('Erro', 'Falha ao gravar servidor: ' + err, 'error');
             }
         }
     });
 }
 
 async function deleteVmware(id) {
-    const confirm = await swalEnging.fire({
+    const confirm = await swalTheme.fire({
         title: 'Eliminar Servidor VMware?',
         icon: 'warning',
         showCancelButton: true,
@@ -3377,13 +3377,13 @@ async function deleteVmware(id) {
             await fetch(`/api/connections/vmware/${id}`, { method: 'DELETE' });
             loadConnectionsData();
         } catch (e) {
-            swalEnging.fire('Erro', 'Falha ao eliminar: ' + e, 'error');
+            swalTheme.fire('Erro', 'Falha ao eliminar: ' + e, 'error');
         }
     }
 }
 
 async function testVmware(id) {
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Testando Conexão VMware...',
         didOpen: () => Swal.showLoading()
     });
@@ -3392,13 +3392,13 @@ async function testVmware(id) {
         const res = await fetch(`/api/connections/vmware/test/${id}`, { method: 'POST' });
         const data = await res.json();
         if (data.success) {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'success',
                 title: 'Conexão VMware Concluída!',
                 text: data.message
             });
         } else {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'error',
                 title: 'Falha na Conexão VMware',
                 text: data.message || data.error
@@ -3406,7 +3406,7 @@ async function testVmware(id) {
         }
         loadConnectionsData();
     } catch (e) {
-        swalEnging.fire('Erro', 'Falha ao testar conexão: ' + e, 'error');
+        swalTheme.fire('Erro', 'Falha ao testar conexão: ' + e, 'error');
     }
 }
 
@@ -3497,8 +3497,8 @@ function renderGatewaysList() {
                 <button onclick="openWhatsAppChatModal()" title="Abrir Chat Interativo WhatsApp" class="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px] border border-emerald-200 transition inline-flex items-center gap-1 shadow-xs">
                     <i data-lucide="message-square" class="w-3 h-3"></i> Testar Chat
                 </button>
-                <button onclick="openEditGatewayModal('whatsapp')" title="Configurações e QR Code" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-enging-navy font-bold text-[11px] border border-slate-200 transition inline-flex items-center gap-1 shadow-xs">
-                    <i data-lucide="edit-2" class="w-3 h-3 text-enging-orange"></i> Editar
+                <button onclick="openEditGatewayModal('whatsapp')" title="Configurações e QR Code" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-800 font-bold text-[11px] border border-slate-200 transition inline-flex items-center gap-1 shadow-xs">
+                    <i data-lucide="edit-2" class="w-3 h-3 text-orange-600"></i> Editar
                 </button>
             </td>
         </tr>
@@ -3529,8 +3529,8 @@ function renderGatewaysList() {
                 <button onclick="testChannelDirect('email')" title="Testar Envio" class="px-2.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[11px] border border-purple-200 transition inline-flex items-center gap-1 shadow-xs">
                     <i data-lucide="send" class="w-3 h-3"></i> Testar
                 </button>
-                <button onclick="openEditGatewayModal('smtp')" title="Editar Servidor SMTP" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-enging-navy font-bold text-[11px] border border-slate-200 transition inline-flex items-center gap-1 shadow-xs">
-                    <i data-lucide="edit-2" class="w-3 h-3 text-enging-orange"></i> Editar
+                <button onclick="openEditGatewayModal('smtp')" title="Editar Servidor SMTP" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-800 font-bold text-[11px] border border-slate-200 transition inline-flex items-center gap-1 shadow-xs">
+                    <i data-lucide="edit-2" class="w-3 h-3 text-orange-600"></i> Editar
                 </button>
             </td>
         </tr>
@@ -3561,8 +3561,8 @@ function renderGatewaysList() {
                 <button onclick="testChannelDirect('sms')" title="Testar SMS" class="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] border border-blue-200 transition inline-flex items-center gap-1 shadow-xs">
                     <i data-lucide="send" class="w-3 h-3"></i> Testar
                 </button>
-                <button onclick="openEditGatewayModal('sms')" title="Editar SMS Gateway" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-enging-navy font-bold text-[11px] border border-slate-200 transition inline-flex items-center gap-1 shadow-xs">
-                    <i data-lucide="edit-2" class="w-3 h-3 text-enging-orange"></i> Editar
+                <button onclick="openEditGatewayModal('sms')" title="Editar SMS Gateway" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-800 font-bold text-[11px] border border-slate-200 transition inline-flex items-center gap-1 shadow-xs">
+                    <i data-lucide="edit-2" class="w-3 h-3 text-orange-600"></i> Editar
                 </button>
             </td>
         </tr>
@@ -3598,8 +3598,8 @@ function renderGatewaysList() {
                 <button onclick="testChannelDirect('teams')" title="Testar Microsoft Teams" class="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] border border-blue-200 transition inline-flex items-center gap-1 shadow-xs">
                     <i data-lucide="send" class="w-3 h-3"></i> Testar
                 </button>
-                <button onclick="openEditGatewayModal('teams')" title="Editar Microsoft Teams" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-enging-navy font-bold text-[11px] border border-slate-200 transition inline-flex items-center gap-1 shadow-xs">
-                    <i data-lucide="edit-2" class="w-3 h-3 text-enging-orange"></i> Editar
+                <button onclick="openEditGatewayModal('teams')" title="Editar Microsoft Teams" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-800 font-bold text-[11px] border border-slate-200 transition inline-flex items-center gap-1 shadow-xs">
+                    <i data-lucide="edit-2" class="w-3 h-3 text-orange-600"></i> Editar
                 </button>
             </td>
         </tr>
@@ -3635,8 +3635,8 @@ function renderGatewaysList() {
                 <button onclick="testChannelDirect('google_chat')" title="Testar Google Chat" class="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px] border border-emerald-200 transition inline-flex items-center gap-1 shadow-xs">
                     <i data-lucide="send" class="w-3 h-3"></i> Testar
                 </button>
-                <button onclick="openEditGatewayModal('google_chat')" title="Editar Google Chat" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-enging-navy font-bold text-[11px] border border-slate-200 transition inline-flex items-center gap-1 shadow-xs">
-                    <i data-lucide="edit-2" class="w-3 h-3 text-enging-orange"></i> Editar
+                <button onclick="openEditGatewayModal('google_chat')" title="Editar Google Chat" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-800 font-bold text-[11px] border border-slate-200 transition inline-flex items-center gap-1 shadow-xs">
+                    <i data-lucide="edit-2" class="w-3 h-3 text-orange-600"></i> Editar
                 </button>
             </td>
         </tr>
@@ -3667,8 +3667,8 @@ function renderGatewaysList() {
                 <button onclick="testChannelDirect('webhook')" title="Testar Webhook Genérico" class="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-[11px] border border-amber-200 transition inline-flex items-center gap-1 shadow-xs">
                     <i data-lucide="send" class="w-3 h-3"></i> Testar
                 </button>
-                <button onclick="openEditGatewayModal('webhook')" title="Editar Webhook Genérico" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-enging-navy font-bold text-[11px] border border-slate-200 transition inline-flex items-center gap-1 shadow-xs">
-                    <i data-lucide="edit-2" class="w-3 h-3 text-enging-orange"></i> Editar
+                <button onclick="openEditGatewayModal('webhook')" title="Editar Webhook Genérico" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-800 font-bold text-[11px] border border-slate-200 transition inline-flex items-center gap-1 shadow-xs">
+                    <i data-lucide="edit-2" class="w-3 h-3 text-orange-600"></i> Editar
                 </button>
             </td>
         </tr>
@@ -3712,7 +3712,7 @@ async function openEditGatewayModal(type) {
         const phone = statusData.user?.phone || '';
         const name = statusData.user?.name || 'WhatsApp Web';
 
-        swalEnging.fire({
+        swalTheme.fire({
             title: isConn ? 'WhatsApp Web Conectado' : 'Conectar WhatsApp Web',
             html: `
                 <div class="text-left space-y-4 font-sans text-xs">
@@ -3752,7 +3752,7 @@ async function openEditGatewayModal(type) {
                         <div class="p-3.5 bg-white rounded-2xl border border-slate-200 space-y-2">
                             <div class="flex items-center justify-between">
                                 <span class="text-slate-500">Nome da Sessão:</span>
-                                <strong class="text-slate-800">${sessConf.name || 'Enging UPS Notifier ⚡'}</strong>
+                                <strong class="text-slate-800">${sessConf.name || 'NUT Panel Notifier ⚡'}</strong>
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="text-slate-500">Telefone Conectado:</span>
@@ -3773,17 +3773,17 @@ async function openEditGatewayModal(type) {
                     <!-- Configurações de Personalização da Sessão -->
                     <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
                         <div class="font-bold text-slate-800 flex items-center gap-1.5 uppercase text-[11px]">
-                            <i data-lucide="palette" class="w-3.5 h-3.5 text-enging-orange"></i> Personalização da Identidade da Sessão
+                            <i data-lucide="palette" class="w-3.5 h-3.5 text-orange-600"></i> Personalização da Identidade da Sessão
                         </div>
                         <div>
                             <label class="block text-slate-600 font-bold mb-1">Nome do Remetente (Identificador nos alertas)</label>
-                            <input type="text" id="modal-wa-sess-name" class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white font-medium" placeholder="Enging UPS Notifier ⚡" value="${sessConf.name || 'Enging UPS Notifier ⚡'}">
+                            <input type="text" id="modal-wa-sess-name" class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white font-medium" placeholder="NUT Panel Notifier ⚡" value="${sessConf.name || 'NUT Panel Notifier ⚡'}">
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <div>
                                 <label class="block text-slate-600 font-bold mb-1">Ícone / Avatar</label>
                                 <select id="modal-wa-sess-avatar" onchange="const u = document.getElementById('modal-wa-sess-url-box'); if(this.value==='custom') u.classList.remove('hidden'); else u.classList.add('hidden');" class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white">
-                                    <option value="enging" ${sessConf.avatar === 'enging' ? 'selected' : ''}>⚡ Enging Laranja</option>
+                                    <option value="zap" ${sessConf.avatar === 'zap' ? 'selected' : ''}>⚡ Laranja Clássico</option>
                                     <option value="robot" ${sessConf.avatar === 'robot' ? 'selected' : ''}>🤖 Robô Assistente</option>
                                     <option value="server" ${sessConf.avatar === 'server' ? 'selected' : ''}>🖥️ Servidor Datacenter</option>
                                     <option value="battery" ${sessConf.avatar === 'battery' ? 'selected' : ''}>🔋 UPS & Bateria</option>
@@ -3816,7 +3816,7 @@ async function openEditGatewayModal(type) {
                             <div class="grid grid-cols-2 gap-2">
                                 <div>
                                     <label class="block text-slate-600 font-bold mb-1">Instance / Sessão</label>
-                                    <input type="text" id="modal-wa-inst" class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white font-mono" placeholder="enging-ups" value="${wa.instance_id || ''}">
+                                    <input type="text" id="modal-wa-inst" class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white font-mono" placeholder="brand-ups" value="${wa.instance_id || ''}">
                                 </div>
                                 <div>
                                     <label class="block text-slate-600 font-bold mb-1">API Token / Key</label>
@@ -3883,8 +3883,8 @@ async function openEditGatewayModal(type) {
             }
         }).then(async (result) => {
             if (result.isConfirmed) {
-                const sessName = document.getElementById('modal-wa-sess-name')?.value.trim() || 'Enging UPS Notifier ⚡';
-                const sessAvatar = document.getElementById('modal-wa-sess-avatar')?.value || 'enging';
+                const sessName = document.getElementById('modal-wa-sess-name')?.value.trim() || 'NUT Panel Notifier ⚡';
+                const sessAvatar = document.getElementById('modal-wa-sess-avatar')?.value || 'brand';
                 const sessAvatarUrl = document.getElementById('modal-wa-sess-avatar-url')?.value.trim() || '';
 
                 // 1. Salva Session Config (Baileys)
@@ -3926,7 +3926,7 @@ async function openEditGatewayModal(type) {
         });
 
     } else if (type === 'smtp') {
-        swalEnging.fire({
+        swalTheme.fire({
             title: 'Configuração do Servidor SMTP (E-mail)',
             html: `
                 <div class="text-left space-y-3 font-sans text-xs">
@@ -3954,7 +3954,7 @@ async function openEditGatewayModal(type) {
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-slate-700 font-bold mb-1">Utilizador / E-mail</label>
-                            <input type="text" id="modal-smtp-user" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono" placeholder="alerts@enging.pt" value="${smtp.username || ''}">
+                            <input type="text" id="modal-smtp-user" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono" placeholder="alerts@example.com" value="${smtp.username || ''}">
                         </div>
                         <div>
                             <label class="block text-slate-700 font-bold mb-1">Senha / App Password</label>
@@ -3965,11 +3965,11 @@ async function openEditGatewayModal(type) {
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-slate-700 font-bold mb-1">Nome Remetente</label>
-                            <input type="text" id="modal-smtp-fromname" class="w-full px-3 py-2 border border-slate-200 rounded-xl" placeholder="Enging UPS System" value="${smtp.from_name || 'Enging UPS System'}">
+                            <input type="text" id="modal-smtp-fromname" class="w-full px-3 py-2 border border-slate-200 rounded-xl" placeholder="NUT Panel" value="${smtp.from_name || 'NUT Panel'}">
                         </div>
                         <div>
                             <label class="block text-slate-700 font-bold mb-1">E-mail Remetente</label>
-                            <input type="text" id="modal-smtp-fromemail" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono" placeholder="alerts@enging.pt" value="${smtp.from_email || smtp.username || 'alerts@enging.pt'}">
+                            <input type="text" id="modal-smtp-fromemail" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono" placeholder="alerts@example.com" value="${smtp.from_email || smtp.username || 'alerts@example.com'}">
                         </div>
                     </div>
 
@@ -4001,8 +4001,8 @@ async function openEditGatewayModal(type) {
                         use_tls: document.getElementById('modal-smtp-tls').checked,
                         username: document.getElementById('modal-smtp-user').value.trim(),
                         password: document.getElementById('modal-smtp-pass').value,
-                        from_name: document.getElementById('modal-smtp-fromname').value.trim() || 'Enging UPS System',
-                        from_email: document.getElementById('modal-smtp-fromemail').value.trim() || 'alerts@enging.pt'
+                        from_name: document.getElementById('modal-smtp-fromname').value.trim() || 'NUT Panel',
+                        from_email: document.getElementById('modal-smtp-fromemail').value.trim() || 'alerts@example.com'
                     }
                 };
                 await saveChannelsPayload(updatedChannels);
@@ -4010,7 +4010,7 @@ async function openEditGatewayModal(type) {
         });
 
     } else if (type === 'sms') {
-        swalEnging.fire({
+        swalTheme.fire({
             title: 'Configuração do SMS Gateway HTTP',
             html: `
                 <div class="text-left space-y-3 font-sans text-xs">
@@ -4065,7 +4065,7 @@ async function openEditGatewayModal(type) {
         });
 
     } else if (type === 'teams') {
-        swalEnging.fire({
+        swalTheme.fire({
             title: 'Microsoft Teams Webhook',
             html: `
                 <div class="text-left space-y-3 font-sans text-xs">
@@ -4092,7 +4092,7 @@ async function openEditGatewayModal(type) {
 
                     <div>
                         <label class="block text-slate-700 font-bold mb-1">Incoming Webhook / Power Automate URL</label>
-                        <input type="text" id="modal-teams-url" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-xs focus:outline-none focus:border-blue-600" placeholder="https://enging.webhook.office.com/webhookb2/... ou https://prod-xx.westeurope.logic.azure.com/..." value="${teams.webhook_url || ''}">
+                        <input type="text" id="modal-teams-url" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-xs focus:outline-none focus:border-blue-600" placeholder="https://webhook.office.com/webhookb2/... ou https://prod-xx.westeurope.logic.azure.com/..." value="${teams.webhook_url || ''}">
                     </div>
 
                     <div>
@@ -4139,7 +4139,7 @@ async function openEditGatewayModal(type) {
         });
 
     } else if (type === 'google_chat') {
-        swalEnging.fire({
+        swalTheme.fire({
             title: 'Google Chat Webhook',
             html: `
                 <div class="text-left space-y-3 font-sans text-xs">
@@ -4202,7 +4202,7 @@ async function openEditGatewayModal(type) {
         });
 
     } else if (type === 'webhook') {
-        swalEnging.fire({
+        swalTheme.fire({
             title: 'Webhook Genérico & SIEM',
             html: `
                 <div class="text-left space-y-3 font-sans text-xs">
@@ -4224,7 +4224,7 @@ async function openEditGatewayModal(type) {
 
                     <div>
                         <label class="block text-slate-700 font-bold mb-1">Webhook Padrão (JSON POST)</label>
-                        <input type="text" id="modal-wh-url" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-xs focus:outline-none focus:border-amber-500" placeholder="https://zabbix.enging.pt/api/webhook/ups" value="${wh.default_url || ''}">
+                        <input type="text" id="modal-wh-url" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-xs focus:outline-none focus:border-amber-500" placeholder="https://zabbix.brand.pt/api/webhook/ups" value="${wh.default_url || ''}">
                     </div>
 
                     <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-[11px] text-slate-600 space-y-1.5">
@@ -4268,7 +4268,7 @@ async function saveChannelsPayload(payload) {
         });
         const data = await res.json();
         if (data.success) {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'success',
                 title: 'Configurações Gravadas com Sucesso!',
                 timer: 1500,
@@ -4278,7 +4278,7 @@ async function saveChannelsPayload(payload) {
             renderGatewaysList();
         }
     } catch (e) {
-        swalEnging.fire('Erro', 'Falha ao gravar configurações: ' + e, 'error');
+        swalTheme.fire('Erro', 'Falha ao gravar configurações: ' + e, 'error');
     }
 }
 
@@ -4328,7 +4328,7 @@ async function testChannelDirect(channel) {
     if (channel === 'email') {
         title = 'Testar Servidor SMTP (E-mail)';
         targetLabel = 'Endereço de E-mail de Destino';
-        placeholder = 'admin@enging.pt';
+        placeholder = 'admin@example.com';
         defaultTarget = ch.smtp?.from_email || ch.smtp?.username || '';
         availableRecs = recipients.filter(r => r.email);
     } else if (channel === 'sms') {
@@ -4340,7 +4340,7 @@ async function testChannelDirect(channel) {
     } else if (channel === 'teams') {
         title = 'Testar Microsoft Teams Webhook';
         targetLabel = 'Endpoint URL do Teams (POST)';
-        placeholder = 'https://enging.webhook.office.com/... ou Flow URL';
+        placeholder = 'https://webhook.office.com/... ou Flow URL';
         defaultTarget = ch.teams?.webhook_url || '';
         availableRecs = recipients.filter(r => r.teams_webhook || r.webhook_url);
     } else if (channel === 'google_chat') {
@@ -4367,7 +4367,7 @@ async function testChannelDirect(channel) {
             
             <div>
                 <label class="block font-bold text-slate-700 uppercase mb-1">Selecionar Contato / Destinatário</label>
-                <select id="swal-test-rec-select" onchange="onTestChannelRecSelect(this)" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-enging-orange">
+                <select id="swal-test-rec-select" onchange="onTestChannelRecSelect(this)" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-orange-600">
                     <optgroup label="📋 Contatos Cadastrados">
                         ${availableRecs.map(r => {
                             const val = channel === 'email' ? r.email : (channel === 'sms' ? r.phone_sms : (channel === 'teams' ? (r.teams_webhook || r.webhook_url) : (channel === 'google_chat' ? (r.google_chat_webhook || r.webhook_url) : r.webhook_url)));
@@ -4382,7 +4382,7 @@ async function testChannelDirect(channel) {
 
             <div>
                 <label class="block font-bold text-slate-700 uppercase mb-1">${targetLabel}</label>
-                <input id="swal-test-target-input" class="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-enging-orange" placeholder="${placeholder}" value="${initialRecTarget}">
+                <input id="swal-test-target-input" class="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-orange-600" placeholder="${placeholder}" value="${initialRecTarget}">
             </div>
 
             <div class="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-[11px] flex items-center gap-2">
@@ -4392,7 +4392,7 @@ async function testChannelDirect(channel) {
         </div>
     `;
 
-    swalEnging.fire({
+    swalTheme.fire({
         title: title,
         html: modalHtml,
         width: '500px',
@@ -4443,7 +4443,7 @@ async function executeLiveChannelDispatch(channel, target, recId = '', recName =
 
     const cName = channelNames[channel] || channel.toUpperCase();
 
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Transmitindo Notificação...',
         html: `
             <div class="text-left space-y-3 font-sans text-xs py-1">
@@ -4458,7 +4458,7 @@ async function executeLiveChannelDispatch(channel, target, recId = '', recName =
                     </div>
                 </div>
                 <div class="flex items-center justify-center gap-2 text-slate-500 pt-1">
-                    <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-enging-orange"></i>
+                    <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-orange-600"></i>
                     <span>Aguardando resposta do servidor em tempo real...</span>
                 </div>
             </div>
@@ -4487,7 +4487,7 @@ async function executeLiveChannelDispatch(channel, target, recId = '', recName =
         loadAlertsData();
 
         if (data.success) {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'success',
                 title: 'Notificação Enviada com Sucesso!',
                 html: `
@@ -4522,7 +4522,7 @@ async function executeLiveChannelDispatch(channel, target, recId = '', recName =
                 didOpen: () => lucide.createIcons()
             });
         } else {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'error',
                 title: 'Falha no Envio do Teste',
                 html: `
@@ -4557,7 +4557,7 @@ async function executeLiveChannelDispatch(channel, target, recId = '', recName =
             });
         }
     } catch (e) {
-        swalEnging.fire('Erro de Conexão', 'Falha ao comunicar com o servidor: ' + e, 'error');
+        swalTheme.fire('Erro de Conexão', 'Falha ao comunicar com o servidor: ' + e, 'error');
     }
 }
 
@@ -4615,7 +4615,7 @@ function renderApiTokensTable() {
 }
 
 function openCreateTokenModal() {
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Gerar Nova Chave de API (Bearer Token)',
         html: `
             <div class="text-left space-y-3 font-sans text-xs">
@@ -4661,7 +4661,7 @@ function openCreateTokenModal() {
                 });
                 const data = await res.json();
                 if (data.success && data.token) {
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: 'Chave de API Criada!',
                         html: `
@@ -4680,14 +4680,14 @@ function openCreateTokenModal() {
                     loadConnectionsData();
                 }
             } catch (e) {
-                swalEnging.fire('Erro', 'Falha ao gerar token: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao gerar token: ' + e, 'error');
             }
         }
     });
 }
 
 async function deleteApiToken(id) {
-    const confirm = await swalEnging.fire({
+    const confirm = await swalTheme.fire({
         title: 'Revogar Chave de API?',
         text: 'Qualquer sistema externo que utilize esta chave perderá acesso imediato.',
         icon: 'warning',
@@ -4700,7 +4700,7 @@ async function deleteApiToken(id) {
             await fetch(`/api/connections/tokens/${id}`, { method: 'DELETE' });
             loadConnectionsData();
         } catch (e) {
-            swalEnging.fire('Erro', 'Falha ao revogar token: ' + e, 'error');
+            swalTheme.fire('Erro', 'Falha ao revogar token: ' + e, 'error');
         }
     }
 }
@@ -4714,7 +4714,7 @@ function copySnippet(snippetId) {
 function copyToClipboard(text) {
     if (navigator.clipboard) {
         navigator.clipboard.writeText(text).then(() => {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'success',
                 title: 'Copiado para a área de transferência!',
                 timer: 1000,
@@ -4728,7 +4728,7 @@ function copyToClipboard(text) {
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        swalEnging.fire({
+        swalTheme.fire({
             icon: 'success',
             title: 'Copiado!',
             timer: 1000,
@@ -4777,7 +4777,7 @@ async function refreshWhatsAppStatus(manual = false) {
                 connInfo.innerText = `${name} (${phone}) • Pronto para envio de notificações em tempo real`;
             }
             if (manual) {
-                swalEnging.fire({
+                swalTheme.fire({
                     icon: 'success',
                     title: 'WhatsApp Conectado!',
                     text: `Sessão ativa: ${data.user?.phone || ''}`,
@@ -4802,7 +4802,7 @@ async function refreshWhatsAppStatus(manual = false) {
             }
             if (qrSpinner) qrSpinner.classList.add('hidden');
             if (manual) {
-                swalEnging.fire({
+                swalTheme.fire({
                     icon: 'info',
                     title: 'QR Code Atualizado!',
                     text: 'Aponte a câmara do WhatsApp no seu telemóvel para emparelhar.',
@@ -4826,7 +4826,7 @@ async function refreshWhatsAppStatus(manual = false) {
                             clearInterval(waPollInterval);
                             waPollInterval = null;
                             refreshWhatsAppStatus();
-                            swalEnging.fire({
+                            swalTheme.fire({
                                 icon: 'success',
                                 title: 'WhatsApp Vinculado com Sucesso!',
                                 text: `Conta conectada: ${checkData.user?.phone || ''}`,
@@ -4866,7 +4866,7 @@ async function testWhatsAppDirect() {
 }
 
 async function logoutWhatsAppWeb() {
-    const confirm = await swalEnging.fire({
+    const confirm = await swalTheme.fire({
         title: 'Desconectar WhatsApp Web?',
         text: 'A conta atual será desconectada e um novo QR Code será gerado para emparelhamento.',
         icon: 'warning',
@@ -4876,7 +4876,7 @@ async function logoutWhatsAppWeb() {
     });
 
     if (confirm.isConfirmed) {
-        swalEnging.fire({
+        swalTheme.fire({
             title: 'Desconectando sessão...',
             allowOutsideClick: false,
             didOpen: () => Swal.showLoading()
@@ -4886,7 +4886,7 @@ async function logoutWhatsAppWeb() {
             const res = await fetch('/api/whatsapp/logout', { method: 'POST' });
             const data = await res.json();
             if (data.success) {
-                swalEnging.fire({
+                swalTheme.fire({
                     icon: 'info',
                     title: 'Sessão Encerrada',
                     text: 'Um novo QR Code está sendo gerado para conexão.',
@@ -4895,10 +4895,10 @@ async function logoutWhatsAppWeb() {
                 });
                 setTimeout(() => refreshWhatsAppStatus(), 1500);
             } else {
-                swalEnging.fire('Erro', data.error || 'Falha ao desconectar', 'error');
+                swalTheme.fire('Erro', data.error || 'Falha ao desconectar', 'error');
             }
         } catch (e) {
-            swalEnging.fire('Erro', 'Falha ao solicitar desconexão: ' + e, 'error');
+            swalTheme.fire('Erro', 'Falha ao solicitar desconexão: ' + e, 'error');
         }
     }
 }
@@ -4910,8 +4910,8 @@ async function logoutWhatsAppWeb() {
 let chatPollingInterval = null;
 let currentChatTargetPhone = '';
 let currentSessionConfig = {
-    name: 'Enging UPS Notifier ⚡',
-    avatar: 'enging',
+    name: 'NUT Panel Notifier ⚡',
+    avatar: 'zap',
     custom_avatar_url: ''
 };
 
@@ -4963,7 +4963,7 @@ async function openWhatsAppChatModal(targetPhone = null) {
     }
 
     if (!statusData || !statusData.connected) {
-        const askConnect = await swalEnging.fire({
+        const askConnect = await swalTheme.fire({
             icon: 'warning',
             title: 'WhatsApp Desconectado',
             text: 'É necessário emparelhar o WhatsApp Web escaneando o QR Code antes de abrir o chat de teste.',
@@ -5006,10 +5006,10 @@ async function openWhatsAppChatModal(targetPhone = null) {
     const isConnectedSelf = selectedTarget === connectedPhone;
     const isCustom = !isMatchedInRecs && !isConnectedSelf;
 
-    const sessionName = currentSessionConfig.name || 'Enging UPS Notifier ⚡';
+    const sessionName = currentSessionConfig.name || 'NUT Panel Notifier ⚡';
     const avatarHtml = getSessionAvatarHtml(currentSessionConfig.avatar, currentSessionConfig.custom_avatar_url, 'w-10 h-10 rounded-full');
 
-    swalEnging.fire({
+    swalTheme.fire({
         html: `
             <div class="flex flex-col h-[580px] w-full rounded-3xl overflow-hidden bg-slate-100 border border-slate-300 font-sans shadow-2xl select-none text-left">
                 
@@ -5071,12 +5071,12 @@ async function openWhatsAppChatModal(targetPhone = null) {
                 <!-- 2. Barra de Ações Rápidas / Simulação de Alertas da UPS -->
                 <div class="bg-[#f0f2f5] border-b border-slate-200 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 text-xs shadow-inner">
                     <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
-                        <i data-lucide="zap" class="w-3 h-3 text-enging-orange"></i> Simular:
+                        <i data-lucide="zap" class="w-3 h-3 text-orange-600"></i> Simular:
                     </span>
-                    <button onclick="sendQuickChatMessage('🚨 *ALERTA ENGING UPS: FALHA DE ENERGIA* 🚨\\n━━━━━━━━━━━━━━━━━━━━━━\\n⚠️ Falta de energia elétrica! UPS está a funcionar em modo Bateria.\\n🔋 Bateria: 92% (Tensão: 220V)\\n🔌 Saída: 230V | Carga: 18% (1.08 kW)\\n🕒 Hora: ' + new Date().toLocaleTimeString('pt-PT') + '\\nPainel: https://10.255.255.28/')" class="px-2.5 py-1 rounded-full bg-white hover:bg-rose-50 hover:text-rose-700 text-slate-700 border border-slate-200 text-[11px] font-bold transition shrink-0 shadow-xs flex items-center gap-1">
+                    <button onclick="sendQuickChatMessage('🚨 *ALERTA NUT PANEL: FALHA DE ENERGIA* 🚨\\n━━━━━━━━━━━━━━━━━━━━━━\\n⚠️ Falta de energia elétrica! UPS está a funcionar em modo Bateria.\\n🔋 Bateria: 92% (Tensão: 220V)\\n🔌 Saída: 230V | Carga: 18% (1.08 kW)\\n🕒 Hora: ' + new Date().toLocaleTimeString('pt-PT') + '\\nPainel: https://10.255.255.28/')" class="px-2.5 py-1 rounded-full bg-white hover:bg-rose-50 hover:text-rose-700 text-slate-700 border border-slate-200 text-[11px] font-bold transition shrink-0 shadow-xs flex items-center gap-1">
                         🚨 Falha AC
                     </button>
-                    <button onclick="sendQuickChatMessage('🔋 *ALERTA ENGING UPS: BATERIA CRÍTICA* 🔋\\n━━━━━━━━━━━━━━━━━━━━━━\\n⚠️ Nível de bateria crítico: 15% (Limite: ≤ 20%).\\nTempo estimado de autonomia: ~3 minutos.\\nIniciando sequência de desligamento dos nós Proxmox.\\n🕒 Hora: ' + new Date().toLocaleTimeString('pt-PT'))" class="px-2.5 py-1 rounded-full bg-white hover:bg-amber-50 hover:text-amber-700 text-slate-700 border border-slate-200 text-[11px] font-bold transition shrink-0 shadow-xs flex items-center gap-1">
+                    <button onclick="sendQuickChatMessage('🔋 *ALERTA NUT PANEL: BATERIA CRÍTICA* 🔋\\n━━━━━━━━━━━━━━━━━━━━━━\\n⚠️ Nível de bateria crítico: 15% (Limite: ≤ 20%).\\nTempo estimado de autonomia: ~3 minutos.\\nIniciando sequência de desligamento dos nós Proxmox.\\n🕒 Hora: ' + new Date().toLocaleTimeString('pt-PT'))" class="px-2.5 py-1 rounded-full bg-white hover:bg-amber-50 hover:text-amber-700 text-slate-700 border border-slate-200 text-[11px] font-bold transition shrink-0 shadow-xs flex items-center gap-1">
                         🔋 Bateria 15%
                     </button>
                     <button onclick="sendQuickChatMessage('✅ *ENERGIA ELÉTRICA RESTABELECIDA* ✅\\n━━━━━━━━━━━━━━━━━━━━━━\\nRede AC restaurada (230.1V 50.0Hz).\\nUPS retornou ao modo Online Normal.\\nBateria em recarga: 94%\\n🕒 Hora: ' + new Date().toLocaleTimeString('pt-PT'))" class="px-2.5 py-1 rounded-full bg-white hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 border border-slate-200 text-[11px] font-bold transition shrink-0 shadow-xs flex items-center gap-1">
@@ -5184,7 +5184,7 @@ async function fetchAndRenderChatMessages(forceScroll = false) {
         if (data.session_config) {
             currentSessionConfig = { ...currentSessionConfig, ...data.session_config };
             const nameEl = document.getElementById('chat-header-name');
-            if (nameEl) nameEl.innerText = currentSessionConfig.name || 'Enging UPS Notifier ⚡';
+            if (nameEl) nameEl.innerText = currentSessionConfig.name || 'NUT Panel Notifier ⚡';
         }
 
         renderChatMessagesList(data.messages || [], forceScroll);
@@ -5235,7 +5235,7 @@ function renderChatMessagesList(messages, forceScroll = false) {
         const isMe = m.fromMe;
         const bubbleBg = isMe ? 'bg-[#d9fdd3] ml-auto text-slate-900' : 'bg-white mr-auto text-slate-900';
         const align = isMe ? 'justify-end' : 'justify-start';
-        const senderLabel = isMe ? (currentSessionConfig.name || 'Enging UPS') : (m.senderName || m.phone || 'Destinatário');
+        const senderLabel = isMe ? (currentSessionConfig.name || 'NUT Panel') : (m.senderName || m.phone || 'Destinatário');
         const formattedText = formatChatText(m.text);
 
         return `
@@ -5295,21 +5295,21 @@ async function sendQuickChatMessage(text) {
             await fetchAndRenderChatMessages(true);
             loadAlertsData();
         } else {
-            swalEnging.fire({
+            swalTheme.fire({
                 icon: 'error',
                 title: 'Erro no Envio',
                 text: data.error || 'Falha ao transmitir mensagem via WhatsApp Web.'
             });
         }
     } catch(e) {
-        swalEnging.fire('Erro', 'Falha ao comunicar com o microserviço: ' + e, 'error');
+        swalTheme.fire('Erro', 'Falha ao comunicar com o microserviço: ' + e, 'error');
     } finally {
         if (sendBtn) sendBtn.disabled = false;
     }
 }
 
 async function clearWhatsAppChatHistory() {
-    const confirm = await swalEnging.fire({
+    const confirm = await swalTheme.fire({
         title: 'Limpar Conversa de Teste?',
         text: 'O histórico local de mensagens simuladas será limpo.',
         icon: 'warning',
@@ -5338,14 +5338,14 @@ async function openCustomSessionModal() {
     } catch(e) {}
 
     const presets = [
-        { id: 'enging', label: '⚡ Enging Laranja (Padrão)' },
+        { id: 'zap', label: '⚡ Laranja Clássico (Padrão)' },
         { id: 'robot', label: '🤖 Robô Assistente' },
         { id: 'server', label: '🖥️ Servidor Datacenter' },
         { id: 'battery', label: '🔋 UPS & Bateria' },
         { id: 'shield', label: '🛡️ Proteção Elétrica' }
     ];
 
-    swalEnging.fire({
+    swalTheme.fire({
         title: 'Personalizar Sessão WhatsApp',
         html: `
             <div class="text-left space-y-4 font-sans text-xs">
@@ -5353,13 +5353,13 @@ async function openCustomSessionModal() {
                 
                 <div>
                     <label class="block font-bold text-slate-700 uppercase mb-1">Nome do Remetente desta Sessão</label>
-                    <input id="sess-name-input" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-enging-orange" placeholder="Ex: Enging UPS Notifier ⚡" value="${conf.name || 'Enging UPS Notifier ⚡'}">
+                    <input id="sess-name-input" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-orange-600" placeholder="Ex: NUT Panel Notifier ⚡" value="${conf.name || 'NUT Panel Notifier ⚡'}">
                     <span class="text-[10px] text-slate-400 mt-1 block">Este nome será exibido no cabeçalho das mensagens transmitidas pelo servidor.</span>
                 </div>
 
                 <div>
                     <label class="block font-bold text-slate-700 uppercase mb-1">Avatar / Foto da Sessão</label>
-                    <select id="sess-avatar-select" onchange="toggleCustomAvatarField(this.value)" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange">
+                    <select id="sess-avatar-select" onchange="toggleCustomAvatarField(this.value)" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-orange-600">
                         ${presets.map(p => `<option value="${p.id}" ${conf.avatar === p.id ? 'selected' : ''}>${p.label}</option>`).join('')}
                         <option value="custom" ${conf.avatar === 'custom' || conf.custom_avatar_url ? 'selected' : ''}>🌐 URL de Imagem Personalizada</option>
                     </select>
@@ -5367,7 +5367,7 @@ async function openCustomSessionModal() {
 
                 <div id="sess-custom-avatar-box" class="${(conf.avatar === 'custom' || conf.custom_avatar_url) ? '' : 'hidden'} space-y-1">
                     <label class="block font-bold text-slate-700 uppercase mb-1">URL da Foto / Imagem (HTTPS)</label>
-                    <input id="sess-avatar-url" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs focus:outline-none focus:border-enging-orange" placeholder="https://dominio.com/avatar.png" value="${conf.custom_avatar_url || ''}">
+                    <input id="sess-avatar-url" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs focus:outline-none focus:border-orange-600" placeholder="https://dominio.com/avatar.png" value="${conf.custom_avatar_url || ''}">
                 </div>
 
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] flex items-center gap-2">
@@ -5422,7 +5422,7 @@ async function openCustomSessionModal() {
                         lucide.createIcons();
                     }
 
-                    swalEnging.fire({
+                    swalTheme.fire({
                         icon: 'success',
                         title: 'Sessão Personalizada!',
                         text: `Nome configurado: ${result.value.name}`,
@@ -5431,7 +5431,7 @@ async function openCustomSessionModal() {
                     });
                 }
             } catch(e) {
-                swalEnging.fire('Erro', 'Falha ao salvar configuração: ' + e, 'error');
+                swalTheme.fire('Erro', 'Falha ao salvar configuração: ' + e, 'error');
             }
         }
     });

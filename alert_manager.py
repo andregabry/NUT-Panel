@@ -20,7 +20,7 @@ DEFAULT_ALERTS_DATA = {
         {
             "id": "rec-1",
             "name": "Administrador TI / Suporte",
-            "email": "admin@enging.pt",
+            "email": "admin@example.com",
             "phone_whatsapp": "+351912345678",
             "phone_sms": "+351912345678",
             "webhook_url": "",
@@ -36,8 +36,8 @@ DEFAULT_ALERTS_DATA = {
             "use_tls": True,
             "username": "",
             "password": "",
-            "from_email": "ups-alerts@enging.pt",
-            "from_name": "Enging UPS System"
+            "from_email": "ups-alerts@example.com",
+            "from_name": "NUT Panel"
         },
         "whatsapp": {
             "enabled": False,
@@ -363,7 +363,7 @@ class AlertManager:
         recipients = [r for r in self.data.get("recipients", []) if r.get("id") in rec_ids and r.get("enabled", True)]
         settings = self.data.get("channel_settings", {})
 
-        subject = f"[ALERTA UPS] {rule.get('name', 'Alerta')} - Enging UPS System"
+        subject = f"[ALERTA UPS] {rule.get('name', 'Alerta')} - NUT Panel"
         body_text = self._build_alert_message(rule, condition_desc, nut_data)
 
         sent_emails = set()
@@ -469,7 +469,7 @@ class AlertManager:
             custom_part = ""
 
         msg = (
-            f"🚨 *ALERTA ENGING UPS SYSTEM* 🚨\n"
+            f"🚨 *ALERTA NUT PANEL* 🚨\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"📌 *Evento:* {rule['name']}\n"
             f"⚠️ *Detalhe:* {condition_desc}\n"
@@ -480,9 +480,7 @@ class AlertManager:
             f"⚡ *Entrada AC:* {inp.get('voltage', 0):.1f} V ({inp.get('frequency', 0):.1f} Hz)\n"
             f"🔌 *Saída UPS:* {out.get('voltage', 0):.1f} V | Carga: {out.get('load_pct', 0):.1f}% ({out.get('real_power_w', 0):.0f} W)\n"
             f"📊 *Modo:* {status.get('label', 'NORMAL').upper()}\n"
-            f"🖥️ *Servidor:* 10.255.255.28 (INVT HT1106XS)\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Painel: https://10.255.255.28/"
+            f"━━━━━━━━━━━━━━━━━━━━━━"
         )
         return msg
 
@@ -520,8 +518,8 @@ class AlertManager:
         use_tls = smtp_cfg.get("use_tls", True)
         user = smtp_cfg.get("username", "").strip()
         password = smtp_cfg.get("password", "")
-        from_email = smtp_cfg.get("from_email", user or "alerts@enging.pt").strip()
-        from_name = smtp_cfg.get("from_name", "Enging UPS System").strip()
+        from_email = smtp_cfg.get("from_email", user or "alerts@example.com").strip()
+        from_name = smtp_cfg.get("from_name", "NUT Panel").strip()
 
         try:
             msg = MIMEMultipart()
@@ -721,7 +719,7 @@ class AlertManager:
                     "items": [
                         {
                             "type": "TextBlock",
-                            "text": f"🚨 [ALERTA ENGING UPS] {rule_name}",
+                            "text": f"🚨 [ALERTA UPS] {rule_name}",
                             "weight": "Bolder",
                             "size": "Medium",
                             "color": "Attention" if ("Crítica" in rule_name or "Falta" in rule_name or "Sobrecarga" in rule_name) else "Default",
@@ -744,7 +742,6 @@ class AlertManager:
                         {"title": "⚡ Entrada AC:", "value": f"{inp.get('voltage', 0):.1f} V ({inp.get('frequency', 0):.1f} Hz)"},
                         {"title": "🔌 Saída UPS:", "value": f"{out.get('voltage', 0):.1f} V | Carga: {out.get('load_pct', 0):.1f}% ({out.get('real_power_w', 0):.0f} W)"},
                         {"title": "📊 Estado:", "value": str(status.get('label', 'NORMAL')).upper()},
-                        {"title": "🖥️ Servidor:", "value": "10.255.255.28 (INVT HT1106XS)"},
                         {"title": "🕒 Data/Hora:", "value": now_str}
                     ]
                 }
@@ -752,8 +749,8 @@ class AlertManager:
             "actions": [
                 {
                     "type": "Action.OpenUrl",
-                    "title": "🌐 Abrir Dashboard Enging",
-                    "url": "https://10.255.255.28/"
+                    "title": "🌐 Abrir Painel",
+                    "url": "http://localhost:8080/"
                 }
             ]
         }
@@ -763,11 +760,11 @@ class AlertManager:
             "@type": "MessageCard",
             "@context": "http://schema.org/extensions",
             "themeColor": "E95C0C",
-            "summary": f"🚨 [ALERTA ENGING UPS] {rule_name}",
-            "title": f"🚨 [ALERTA ENGING UPS] {rule_name}",
+            "summary": f"🚨 [ALERTA UPS] {rule_name}",
+            "title": f"🚨 [ALERTA UPS] {rule_name}",
             "text": body_text.replace("\n", "\n\n"),
             "sections": [{
-                "activityTitle": "Enging UPS System • INVT HT1106XS",
+                "activityTitle": "NUT Panel • Monitor UPS",
                 "activitySubtitle": f"Data/Hora: {now_str}",
                 "facts": [
                     {"name": "Evento:", "value": str(rule_name)},
@@ -775,14 +772,13 @@ class AlertManager:
                     {"name": "Bateria:", "value": f"{batt.get('charge_pct', 0):.0f}% ({batt.get('voltage', 0):.1f} V)"},
                     {"name": "Entrada AC:", "value": f"{inp.get('voltage', 0):.1f} V ({inp.get('frequency', 0):.1f} Hz)"},
                     {"name": "Saída UPS:", "value": f"{out.get('voltage', 0):.1f} V | Carga: {out.get('load_pct', 0):.1f}% ({out.get('real_power_w', 0):.0f} W)"},
-                    {"name": "Estado:", "value": str(status.get('label', 'NORMAL')).upper()},
-                    {"name": "Servidor:", "value": "10.255.255.28 (INVT HT1106XS)"}
+                    {"name": "Estado:", "value": str(status.get('label', 'NORMAL')).upper()}
                 ]
             }],
             "potentialAction": [{
                 "@type": "OpenUri",
-                "name": "Abrir Dashboard Enging",
-                "targets": [{"os": "default", "uri": "https://10.255.255.28/"}]
+                "name": "Abrir Painel",
+                "targets": [{"os": "default", "uri": "http://localhost:8080/"}]
             }]
         }
 
@@ -803,14 +799,14 @@ class AlertManager:
         elif format_mode == "attachments":
             primary_payload = attachments_card
         elif format_mode == "simple_text":
-            primary_payload = {"text": f"🚨 *[ALERTA ENGING UPS] {rule_name}*\n\n{body_text}"}
+            primary_payload = {"text": f"🚨 *[ALERTA UPS] {rule_name}*\n\n{body_text}"}
         else:
             # Default: Adaptive Card direto para Power Automate Workflows
             primary_payload = adaptive_card
 
         def _do_post(p_body):
             req_data = json.dumps(p_body).encode("utf-8")
-            headers = {"Content-Type": "application/json", "User-Agent": "Enging-UPS-Notifier/2.0"}
+            headers = {"Content-Type": "application/json", "User-Agent": "NUT-Panel-Notifier/2.0"}
             req = urllib.request.Request(target, data=req_data, headers=headers, method="POST")
             with urllib.request.urlopen(req, timeout=10) as resp:
                 return resp.getcode()
@@ -851,7 +847,7 @@ class AlertManager:
 
             # Fallback 2: texto simples
             try:
-                simple_payload = {"text": f"🚨 [ALERTA ENGING UPS] {rule_name}\n\n{body_text}"}
+                simple_payload = {"text": f"🚨 [ALERTA UPS] {rule_name}\n\n{body_text}"}
                 status_code = _do_post(simple_payload)
                 latency = int((time.time() - t0) * 1000)
                 if 200 <= status_code < 300:
@@ -922,7 +918,7 @@ class AlertManager:
                 "cardId": "ups-alert-card",
                 "card": {
                     "header": {
-                        "title": f"🚨 ALERTA ENGING UPS: {rule_name}",
+                        "title": f"🚨 ALERTA UPS: {rule_name}",
                         "subtitle": f"Disparo em {now_str}",
                         "imageType": "CIRCLE"
                     },
@@ -933,7 +929,7 @@ class AlertManager:
                             {"decoratedText": {"topLabel": "Bateria", "text": f"{batt.get('charge_pct', 0):.0f}% ({batt.get('voltage', 0):.1f} V)", "startIcon": {"knownIcon": "STAR"}}},
                             {"decoratedText": {"topLabel": "Rede Elétrica (Entrada → Saída)", "text": f"{inp.get('voltage', 0):.1f}V → {out.get('voltage', 0):.1f}V (Carga: {out.get('load_pct', 0):.1f}%)"}},
                             {"decoratedText": {"topLabel": "Modo Operacional", "text": str(status.get('label', 'NORMAL')).upper()}},
-                            {"buttonList": {"buttons": [{"text": "Abrir Dashboard Enging UPS", "onClick": {"openLink": {"url": "https://10.255.255.28/"}}}]}}
+                            {"buttonList": {"buttons": [{"text": "Abrir Painel", "onClick": {"openLink": {"url": "http://localhost:8080/"}}}]}}
                         ]
                     }]
                 }
@@ -942,7 +938,7 @@ class AlertManager:
 
         try:
             req_data = json.dumps(payload).encode("utf-8")
-            headers = {"Content-Type": "application/json", "User-Agent": "Enging-UPS-Notifier/2.0"}
+            headers = {"Content-Type": "application/json", "User-Agent": "NUT-Panel-Notifier/2.0"}
             req = urllib.request.Request(target, data=req_data, headers=headers, method="POST")
             with urllib.request.urlopen(req, timeout=10) as resp:
                 status_code = resp.getcode()
@@ -1040,7 +1036,7 @@ class AlertManager:
                     "output": nut_data.get("output", {}) if nut_data else {}
                 }
             }
-            headers = {"Content-Type": "application/json", "User-Agent": "Enging-UPS-Notifier/2.0"}
+            headers = {"Content-Type": "application/json", "User-Agent": "NUT-Panel-Notifier/2.0"}
             req = urllib.request.Request(webhook_url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
             with urllib.request.urlopen(req, timeout=10) as resp:
                 status_code = resp.getcode()
@@ -1175,7 +1171,7 @@ class AlertManager:
             rec = {
                 "id": "test",
                 "name": "Utilizador de Teste",
-                "email": custom_target or "admin@enging.pt",
+                "email": custom_target or "admin@example.com",
                 "phone_whatsapp": custom_target or "+351912345678",
                 "phone_sms": custom_target or "+351912345678",
                 "webhook_teams": custom_target,
@@ -1186,12 +1182,11 @@ class AlertManager:
         settings = self.data.get("channel_settings", {})
         now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         test_msg = (
-            f"🔔 *TESTE DE NOTIFICAÇÃO - ENGING UPS SYSTEM*\n"
+            f"🔔 *TESTE DE NOTIFICAÇÃO - NUT PANEL*\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"Canal testado: *{channel.upper()}*\n"
             f"Destinatário: *{rec.get('name', 'Utilizador de Teste')}*\n"
             f"Hora: {now_str}\n"
-            f"Servidor: 10.255.255.28 (INVT HT1106XS)\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"Se você recebeu esta mensagem, a comunicação com o gateway está 100% operacional! ✅"
         )
@@ -1202,7 +1197,7 @@ class AlertManager:
         if channel == "email":
             target = custom_target or rec.get("email")
             rec["email"] = target
-            return self.send_email_notification(rec, "[TESTE] Notificação Enging UPS System", test_msg, "Teste de Canal", settings.get("smtp", {}))
+            return self.send_email_notification(rec, "[TESTE] Notificação NUT Panel", test_msg, "Teste de Canal", settings.get("smtp", {}))
         elif channel == "whatsapp":
             target = custom_target or rec.get("phone_whatsapp")
             rec["phone_whatsapp"] = target
