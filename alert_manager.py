@@ -515,27 +515,39 @@ class AlertManager:
             self.log_notification(alert_name, rec.get("name", "Contato") if rec else "Contato", "email", False, res["message"], res["detail"])
             return res
 
-        host = smtp_cfg.get("host", "smtp.gmail.com")
-        port = int(smtp_cfg.get("port", 587))
-        use_tls = smtp_cfg.get("use_tls", True)
-        user = smtp_cfg.get("username", "").strip()
-        password = smtp_cfg.get("password", "")
-        from_email = smtp_cfg.get("from_email", user or "alerts@enging.pt").strip()
-        from_name = smtp_cfg.get("from_name", "Enging UPS System").strip()
+        host = (smtp_cfg.get("host") or "smtp.office365.com").strip()
+        port = int(smtp_cfg.get("port") or 587)
+        security_mode = (smtp_cfg.get("security_mode") or ("ssl" if port == 465 else ("starttls" if smtp_cfg.get("use_tls", True) else "none"))).lower().strip()
+        user = (smtp_cfg.get("username") or "").strip()
+        password = smtp_cfg.get("password") or ""
+        
+        from_name = (smtp_cfg.get("from_name") or "Enging UPS System").strip()
+        from_email = (smtp_cfg.get("from_email") or user or "alerts@enging.pt").strip()
+        reply_to = (smtp_cfg.get("reply_to") or "").strip()
 
         try:
             msg = MIMEMultipart()
-            msg["From"] = f"{from_name} <{from_email}>"
+            msg["From"] = f"{from_name} <{from_email}>" if from_name else from_email
             msg["To"] = target
             msg["Subject"] = subject
+            msg["Date"] = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
+            if reply_to:
+                msg["Reply-To"] = reply_to
+
             msg.attach(MIMEText(body_text, "plain", "utf-8"))
 
-            server = smtplib.SMTP(host, port, timeout=10)
-            if use_tls:
-                server.starttls()
+            if security_mode in ("ssl", "tls_direct") or port == 465:
+                server = smtplib.SMTP_SSL(host, port, timeout=12)
+            else:
+                server = smtplib.SMTP(host, port, timeout=12)
+                if security_mode in ("starttls", "tls") or smtp_cfg.get("use_tls", True):
+                    server.starttls()
+
             if user and password:
                 server.login(user, password)
-            server.sendmail(from_email, [target], msg.as_string())
+
+            envelope_sender = from_email or user
+            server.sendmail(envelope_sender, [target], msg.as_string())
             server.quit()
 
             latency = int((time.time() - t0) * 1000)
@@ -544,7 +556,7 @@ class AlertManager:
                 "channel": "email",
                 "target": target,
                 "message": f"E-mail transmitido com sucesso para {target}",
-                "detail": f"Servidor SMTP {host}:{port} respondeu com êxito em {latency}ms.",
+                "detail": f"Enviado como '{from_name}' <{from_email}> via {host}:{port} ({security_mode.upper()}) em {latency}ms.",
                 "latency_ms": latency
             }
             self.log_notification(alert_name, rec.get("name", "Contato") if rec else "Contato", "email", True, res["message"], res["detail"])
@@ -552,7 +564,7 @@ class AlertManager:
 
         except smtplib.SMTPAuthenticationError as auth_err:
             latency = int((time.time() - t0) * 1000)
-            err_msg = "Falha de autenticação SMTP. Verifique o utilizador e senha (para contas Google, utilize uma Senha de Aplicação de 16 dígitos)."
+            err_msg = "Falha de autenticação SMTP. Verifique o utilizador e senha (para Microsoft 365 verifique SMTP AUTH; para Google utilize Senha de Aplicação)."
             res = {"success": False, "channel": "email", "target": target, "message": err_msg, "detail": str(auth_err), "latency_ms": latency}
             self.log_notification(alert_name, rec.get("name", "Contato") if rec else "Contato", "email", False, err_msg, str(auth_err))
             return res

@@ -3444,7 +3444,13 @@ function renderGatewaysList() {
     const smtpStatusBadge = smtp.enabled 
         ? '<span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-300 text-[10px] font-bold">Ativado</span>'
         : '<span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 text-[10px] font-medium">Desativado</span>';
-    const smtpEndpoint = smtp.host ? `${smtp.host}:${smtp.port || 587} (${smtp.username || 'sem user'})` : 'Não configurado';
+    
+    const fromDisplayName = smtp.from_name || 'Enging UPS System';
+    const fromDisplayEmail = smtp.from_email || smtp.username || 'alerts@enging.pt';
+    const secMode = (smtp.security_mode || (smtp.port === 465 ? 'ssl' : (smtp.use_tls !== false ? 'starttls' : 'none'))).toUpperCase();
+    const smtpEndpoint = smtp.host 
+        ? `<div class="font-sans font-bold text-slate-800 text-[11px] truncate max-w-xs">${escapeHtml(fromDisplayName)} &lt;${escapeHtml(fromDisplayEmail)}&gt;</div><div class="text-[10px] font-mono text-slate-400 truncate max-w-xs">Host: ${escapeHtml(smtp.host)}:${smtp.port || 587} (${secMode}) ${smtp.username ? '• Auth: ' + escapeHtml(smtp.username) : '• Sem Auth'}</div>` 
+        : 'Não configurado';
 
     // 3. SMS status info
     const smsStatusBadge = sms.enabled
@@ -3517,9 +3523,9 @@ function renderGatewaysList() {
                 </div>
             </td>
             <td class="p-3.5">
-                <span class="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-mono text-[10px] font-bold border border-purple-200">SMTP TLS / SSL</span>
+                <span class="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-mono text-[10px] font-bold border border-purple-200">${secMode}</span>
             </td>
-            <td class="p-3.5 font-mono text-slate-600 text-[11px] max-w-xs truncate" title="${smtpEndpoint}">
+            <td class="p-3.5 font-mono text-slate-600 text-[11px]">
                 ${smtpEndpoint}
             </td>
             <td class="p-3.5">
@@ -3676,6 +3682,41 @@ function renderGatewaysList() {
 
     lucide.createIcons();
 }
+
+window.applySmtpPreset = function(preset) {
+    const hostEl = document.getElementById('modal-smtp-host');
+    const portEl = document.getElementById('modal-smtp-port');
+    const secEl = document.getElementById('modal-smtp-sec');
+    const noteEl = document.getElementById('modal-smtp-provider-note');
+    if (!hostEl || !portEl || !secEl) return;
+
+    if (preset === 'm365') {
+        hostEl.value = 'smtp.office365.com';
+        portEl.value = '587';
+        secEl.value = 'starttls';
+        if (noteEl) noteEl.innerHTML = '<span class="text-blue-700 font-bold">🏢 Microsoft 365 / Exchange:</span> Utilize a sua conta Microsoft 365 como Utilizador. Se utilizar um <em>From Email</em> diferente da conta autenticada, certifique-se de que a conta possui permissão <strong>Send As</strong> e que o protocolo <em>Authenticated SMTP</em> está ativado.';
+    } else if (preset === 'google') {
+        hostEl.value = 'smtp.gmail.com';
+        portEl.value = '587';
+        secEl.value = 'starttls';
+        if (noteEl) noteEl.innerHTML = '<span class="text-amber-700 font-bold">🌐 Google Workspace / Gmail:</span> Para contas Google com 2FA, crie e utilize uma <strong>Senha de Aplicação</strong> de 16 caracteres em <em>myaccount.google.com/apppasswords</em>.';
+    } else if (preset === 'custom_ssl') {
+        if (!hostEl.value || hostEl.value.includes('office365') || hostEl.value.includes('gmail')) hostEl.value = 'smtp.dominio.com';
+        portEl.value = '465';
+        secEl.value = 'ssl';
+        if (noteEl) noteEl.innerHTML = '<span class="text-purple-700 font-bold">🔒 SSL / TLS Direto:</span> Conexão direta encriptada via porta 465 (SMTPS). Indicado para servidores cPanel, Zimbra ou provedores dedicados.';
+    } else if (preset === 'relay_none') {
+        if (!hostEl.value || hostEl.value.includes('office365') || hostEl.value.includes('gmail')) hostEl.value = '127.0.0.1';
+        portEl.value = '25';
+        secEl.value = 'none';
+        if (noteEl) noteEl.innerHTML = '<span class="text-slate-700 font-bold">🔄 Relé Interno Local:</span> Porta 25 sem encriptação. Para relés que autorizam por IP (whitelist), pode deixar o Utilizador e a Senha em branco.';
+    } else { // custom_starttls
+        if (!hostEl.value || hostEl.value.includes('office365') || hostEl.value.includes('gmail')) hostEl.value = 'smtp.dominio.com';
+        portEl.value = '587';
+        secEl.value = 'starttls';
+        if (noteEl) noteEl.innerHTML = '<span class="text-purple-700 font-bold">⚙️ Servidor Personalizado (STARTTLS):</span> Porta padrão 587 com negociação TLS segura.';
+    }
+};
 
 async function openEditGatewayModal(type) {
     const ch = (allAlertsData && allAlertsData.channel_settings) ? allAlertsData.channel_settings : {};
@@ -3926,11 +3967,21 @@ async function openEditGatewayModal(type) {
         });
 
     } else if (type === 'smtp') {
+        const currentSecMode = smtp.security_mode || (smtp.port === 465 ? 'ssl' : (smtp.use_tls !== false ? 'starttls' : 'none'));
+        let initialPreset = 'custom_starttls';
+        const hostLower = (smtp.host || '').toLowerCase();
+        if (hostLower.includes('office365') || hostLower.includes('outlook')) initialPreset = 'm365';
+        else if (hostLower.includes('gmail') || hostLower.includes('google')) initialPreset = 'google';
+        else if (currentSecMode === 'none' && (smtp.port === 25 || !smtp.username)) initialPreset = 'relay_none';
+        else if (currentSecMode === 'ssl' || smtp.port === 465) initialPreset = 'custom_ssl';
+        else if (currentSecMode === 'starttls') initialPreset = 'custom_starttls';
+
         swalEnging.fire({
             title: 'Configuração do Servidor SMTP (E-mail)',
             html: `
-                <div class="text-left space-y-3 font-sans text-xs">
-                    <div class="flex items-center justify-between p-3 rounded-xl bg-purple-50 border border-purple-200">
+                <div class="text-left space-y-3.5 font-sans text-xs max-h-[75vh] overflow-y-auto pr-1">
+                    <!-- 1. Enable Toggle -->
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-purple-50/70 border border-purple-200">
                         <span class="font-bold text-purple-900 flex items-center gap-2">
                             <i data-lucide="mail" class="w-4 h-4 text-purple-600"></i> Habilitar Envio de E-mails
                         </span>
@@ -3940,69 +3991,133 @@ async function openEditGatewayModal(type) {
                         </label>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-2">
-                        <div class="col-span-2">
-                            <label class="block text-slate-700 font-bold mb-1">Host SMTP</label>
-                            <input type="text" id="modal-smtp-host" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono" placeholder="smtp.gmail.com" value="${smtp.host || 'smtp.gmail.com'}">
+                    <!-- 2. Provedor / Preset Dropdown -->
+                    <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-slate-700 font-bold">Provedor / Modelo de Servidor</label>
+                            <span class="text-[10px] text-purple-600 font-medium font-mono">Preenchimento Rápido</span>
                         </div>
-                        <div>
-                            <label class="block text-slate-700 font-bold mb-1">Porta</label>
-                            <input type="number" id="modal-smtp-port" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono" value="${smtp.port || 587}">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-slate-700 font-bold mb-1">Utilizador / E-mail</label>
-                            <input type="text" id="modal-smtp-user" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono" placeholder="alerts@enging.pt" value="${smtp.username || ''}">
-                        </div>
-                        <div>
-                            <label class="block text-slate-700 font-bold mb-1">Senha / App Password</label>
-                            <input type="password" id="modal-smtp-pass" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono" placeholder="••••••••" value="${smtp.password || ''}">
+                        <select id="modal-smtp-preset" onchange="window.applySmtpPreset(this.value)" class="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white font-bold text-slate-800 text-xs focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600">
+                            <option value="m365" ${initialPreset === 'm365' ? 'selected' : ''}>🏢 Microsoft 365 / Exchange Online (smtp.office365.com:587)</option>
+                            <option value="google" ${initialPreset === 'google' ? 'selected' : ''}>🌐 Google Workspace / Gmail (smtp.gmail.com:587)</option>
+                            <option value="custom_starttls" ${initialPreset === 'custom_starttls' ? 'selected' : ''}>⚙️ Servidor Personalizado (STARTTLS - Porta 587)</option>
+                            <option value="custom_ssl" ${initialPreset === 'custom_ssl' ? 'selected' : ''}>🔒 Servidor Personalizado (SSL Direto - Porta 465)</option>
+                            <option value="relay_none" ${initialPreset === 'relay_none' ? 'selected' : ''}>🔄 Relé Local Interno / Sem Cripto (Porta 25)</option>
+                        </select>
+                        <div id="modal-smtp-provider-note" class="text-[11px] text-slate-600 bg-white p-2 rounded-lg border border-slate-200 mt-1.5 leading-relaxed">
+                            <span class="text-purple-700 font-bold">ℹ️ Servidor SMTP:</span> Configure os parâmetros de envio de acordo com o seu fornecedor de correio ou servidor local.
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-slate-700 font-bold mb-1">Nome Remetente</label>
-                            <input type="text" id="modal-smtp-fromname" class="w-full px-3 py-2 border border-slate-200 rounded-xl" placeholder="Enging UPS System" value="${smtp.from_name || 'Enging UPS System'}">
+                    <!-- 3. Sender Identity (From Name, From Email, Reply-To) -->
+                    <div class="p-3 rounded-xl bg-white border border-purple-200 shadow-xs space-y-2.5">
+                        <div class="font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+                            <i data-lucide="user-check" class="w-3.5 h-3.5 text-purple-600"></i>
+                            <span>Identidade do Remetente (Sender)</span>
                         </div>
+                        
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-slate-700 font-bold mb-1">Nome do Remetente (Sender Name)</label>
+                                <input type="text" id="modal-smtp-fromname" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium focus:border-purple-600" placeholder="Enging UPS System" value="${escapeHtml(smtp.from_name || 'Enging UPS System')}">
+                                <span class="text-[10px] text-slate-400">Ex: Enging UPS, Alertas TI</span>
+                            </div>
+                            <div>
+                                <label class="block text-slate-700 font-bold mb-1">E-mail do Remetente (From Email)</label>
+                                <input type="email" id="modal-smtp-fromemail" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono text-slate-900 focus:border-purple-600" placeholder="alerts@enging.pt" value="${escapeHtml(smtp.from_email || smtp.username || 'alerts@enging.pt')}">
+                                <span class="text-[10px] text-slate-400">Ex: alerts@enging.pt, no-reply@...</span>
+                            </div>
+                        </div>
+
                         <div>
-                            <label class="block text-slate-700 font-bold mb-1">E-mail Remetente</label>
-                            <input type="text" id="modal-smtp-fromemail" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono" placeholder="alerts@enging.pt" value="${smtp.from_email || smtp.username || 'alerts@enging.pt'}">
+                            <label class="block text-slate-700 font-medium mb-1">E-mail de Resposta (Reply-To) <span class="text-slate-400 font-normal">(Opcional)</span></label>
+                            <input type="email" id="modal-smtp-replyto" class="w-full px-3 py-1.5 border border-slate-200 rounded-xl font-mono text-xs text-slate-800 focus:border-purple-600" placeholder="suporte@enging.pt" value="${escapeHtml(smtp.reply_to || '')}">
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-2 pt-1">
-                        <input type="checkbox" id="modal-smtp-tls" ${smtp.use_tls !== false ? 'checked' : ''} class="w-4 h-4 rounded text-purple-600">
-                        <label for="modal-smtp-tls" class="text-slate-600 font-medium">Usar Conexão Segura TLS / STARTTLS</label>
+                    <!-- 4. Server Host, Port & Security -->
+                    <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                        <div class="font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-200/60 pb-1.5">
+                            <i data-lucide="server" class="w-3.5 h-3.5 text-slate-600"></i>
+                            <span>Servidor & Criptografia</span>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="col-span-2">
+                                <label class="block text-slate-700 font-bold mb-1">Host / Servidor SMTP</label>
+                                <input type="text" id="modal-smtp-host" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono focus:border-purple-600" placeholder="smtp.office365.com" value="${escapeHtml(smtp.host || 'smtp.office365.com')}">
+                            </div>
+                            <div>
+                                <label class="block text-slate-700 font-bold mb-1">Porta</label>
+                                <input type="number" id="modal-smtp-port" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono focus:border-purple-600" value="${smtp.port || 587}">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-700 font-bold mb-1">Criptografia / Segurança da Conexão</label>
+                            <select id="modal-smtp-sec" class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white font-medium text-xs focus:border-purple-600">
+                                <option value="starttls" ${currentSecMode === 'starttls' ? 'selected' : ''}>🔒 STARTTLS (Recomendado - Porta 587 ou 25)</option>
+                                <option value="ssl" ${currentSecMode === 'ssl' ? 'selected' : ''}>🛡️ SSL / TLS Direto (SMTPS - Porta 465)</option>
+                                <option value="none" ${currentSecMode === 'none' ? 'selected' : ''}>⚠️ Nenhuma / Sem Criptografia (Porta 25 / Relé Interno)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 5. Authentication -->
+                    <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                        <div class="font-bold text-slate-800 flex items-center justify-between border-b border-slate-200/60 pb-1.5">
+                            <span class="flex items-center gap-1.5"><i data-lucide="key" class="w-3.5 h-3.5 text-slate-600"></i> Autenticação SMTP</span>
+                            <span class="text-[10px] text-slate-400 font-normal">Deixar em branco se for relé anónimo</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-slate-700 font-bold mb-1">Utilizador / Login SMTP</label>
+                                <input type="text" id="modal-smtp-user" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono focus:border-purple-600" placeholder="conta@empresa.com" value="${escapeHtml(smtp.username || '')}">
+                            </div>
+                            <div>
+                                <label class="block text-slate-700 font-bold mb-1">Senha / App Password</label>
+                                <div class="relative">
+                                    <input type="password" id="modal-smtp-pass" class="w-full pl-3 pr-8 py-2 border border-slate-200 rounded-xl font-mono focus:border-purple-600" placeholder="••••••••" value="${escapeHtml(smtp.password || '')}">
+                                    <button type="button" onclick="const p=document.getElementById('modal-smtp-pass'); p.type = p.type==='password'?'text':'password';" class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600">
+                                        <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `,
-            width: '520px',
+            width: '560px',
             showCancelButton: true,
             showDenyButton: true,
             denyButtonText: 'Testar Envio',
             confirmButtonText: 'Guardar SMTP',
             cancelButtonText: 'Cancelar',
-            didOpen: () => lucide.createIcons(),
+            didOpen: () => {
+                lucide.createIcons();
+                window.applySmtpPreset(document.getElementById('modal-smtp-preset').value);
+            },
             preDeny: () => {
                 testChannelDirect('email');
                 return false;
             }
         }).then(async (result) => {
             if (result.isConfirmed) {
+                const secModeVal = document.getElementById('modal-smtp-sec').value;
                 const updatedChannels = {
                     ...ch,
                     smtp: {
                         enabled: document.getElementById('modal-smtp-enabled').checked,
                         host: document.getElementById('modal-smtp-host').value.trim(),
                         port: parseInt(document.getElementById('modal-smtp-port').value) || 587,
-                        use_tls: document.getElementById('modal-smtp-tls').checked,
+                        security_mode: secModeVal,
+                        use_tls: secModeVal !== 'none',
                         username: document.getElementById('modal-smtp-user').value.trim(),
                         password: document.getElementById('modal-smtp-pass').value,
                         from_name: document.getElementById('modal-smtp-fromname').value.trim() || 'Enging UPS System',
-                        from_email: document.getElementById('modal-smtp-fromemail').value.trim() || 'alerts@enging.pt'
+                        from_email: document.getElementById('modal-smtp-fromemail').value.trim() || 'alerts@enging.pt',
+                        reply_to: document.getElementById('modal-smtp-replyto').value.trim()
                     }
                 };
                 await saveChannelsPayload(updatedChannels);

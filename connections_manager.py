@@ -92,13 +92,15 @@ class ConnectionsManager:
                     "last_test": None
                 },
                 "smtp": {
-                    "host": "smtp.gmail.com",
+                    "host": "smtp.office365.com",
                     "port": 587,
+                    "security_mode": "starttls",
                     "use_tls": True,
                     "username": "alerts@enging.pt",
                     "password": "",
-                    "from_email": "alerts@enging.pt",
                     "from_name": "Enging UPS System",
+                    "from_email": "alerts@enging.pt",
+                    "reply_to": "",
                     "enabled": False,
                     "last_test": None
                 },
