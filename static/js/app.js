@@ -26,6 +26,16 @@ const swalEnging = Swal.mixin({
     }
 });
 
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     lucide.createIcons();
@@ -3683,7 +3693,7 @@ function renderGatewaysList() {
     lucide.createIcons();
 }
 
-window.applySmtpPreset = function(preset) {
+window.applySmtpPreset = function(preset, isUserClick = false) {
     const hostEl = document.getElementById('modal-smtp-host');
     const portEl = document.getElementById('modal-smtp-port');
     const secEl = document.getElementById('modal-smtp-sec');
@@ -3691,29 +3701,39 @@ window.applySmtpPreset = function(preset) {
     if (!hostEl || !portEl || !secEl) return;
 
     if (preset === 'm365') {
-        hostEl.value = 'smtp.office365.com';
-        portEl.value = '587';
-        secEl.value = 'starttls';
+        if (isUserClick) {
+            hostEl.value = 'smtp.office365.com';
+            portEl.value = '587';
+            secEl.value = 'starttls';
+        }
         if (noteEl) noteEl.innerHTML = '<span class="text-blue-700 font-bold">🏢 Microsoft 365 / Exchange:</span> Utilize a sua conta Microsoft 365 como Utilizador. Se utilizar um <em>From Email</em> diferente da conta autenticada, certifique-se de que a conta possui permissão <strong>Send As</strong> e que o protocolo <em>Authenticated SMTP</em> está ativado.';
     } else if (preset === 'google') {
-        hostEl.value = 'smtp.gmail.com';
-        portEl.value = '587';
-        secEl.value = 'starttls';
+        if (isUserClick) {
+            hostEl.value = 'smtp.gmail.com';
+            portEl.value = '587';
+            secEl.value = 'starttls';
+        }
         if (noteEl) noteEl.innerHTML = '<span class="text-amber-700 font-bold">🌐 Google Workspace / Gmail:</span> Para contas Google com 2FA, crie e utilize uma <strong>Senha de Aplicação</strong> de 16 caracteres em <em>myaccount.google.com/apppasswords</em>.';
     } else if (preset === 'custom_ssl') {
-        if (!hostEl.value || hostEl.value.includes('office365') || hostEl.value.includes('gmail')) hostEl.value = 'smtp.dominio.com';
-        portEl.value = '465';
-        secEl.value = 'ssl';
+        if (isUserClick) {
+            if (!hostEl.value || hostEl.value.includes('office365') || hostEl.value.includes('gmail')) hostEl.value = 'smtp.dominio.com';
+            portEl.value = '465';
+            secEl.value = 'ssl';
+        }
         if (noteEl) noteEl.innerHTML = '<span class="text-purple-700 font-bold">🔒 SSL / TLS Direto:</span> Conexão direta encriptada via porta 465 (SMTPS). Indicado para servidores cPanel, Zimbra ou provedores dedicados.';
     } else if (preset === 'relay_none') {
-        if (!hostEl.value || hostEl.value.includes('office365') || hostEl.value.includes('gmail')) hostEl.value = '127.0.0.1';
-        portEl.value = '25';
-        secEl.value = 'none';
+        if (isUserClick) {
+            if (!hostEl.value || hostEl.value.includes('office365') || hostEl.value.includes('gmail')) hostEl.value = '127.0.0.1';
+            portEl.value = '25';
+            secEl.value = 'none';
+        }
         if (noteEl) noteEl.innerHTML = '<span class="text-slate-700 font-bold">🔄 Relé Interno Local:</span> Porta 25 sem encriptação. Para relés que autorizam por IP (whitelist), pode deixar o Utilizador e a Senha em branco.';
     } else { // custom_starttls
-        if (!hostEl.value || hostEl.value.includes('office365') || hostEl.value.includes('gmail')) hostEl.value = 'smtp.dominio.com';
-        portEl.value = '587';
-        secEl.value = 'starttls';
+        if (isUserClick) {
+            if (!hostEl.value || hostEl.value.includes('office365') || hostEl.value.includes('gmail')) hostEl.value = 'smtp.dominio.com';
+            portEl.value = '587';
+            secEl.value = 'starttls';
+        }
         if (noteEl) noteEl.innerHTML = '<span class="text-purple-700 font-bold">⚙️ Servidor Personalizado (STARTTLS):</span> Porta padrão 587 com negociação TLS segura.';
     }
 };
@@ -3997,7 +4017,7 @@ async function openEditGatewayModal(type) {
                             <label class="block text-slate-700 font-bold">Provedor / Modelo de Servidor</label>
                             <span class="text-[10px] text-purple-600 font-medium font-mono">Preenchimento Rápido</span>
                         </div>
-                        <select id="modal-smtp-preset" onchange="window.applySmtpPreset(this.value)" class="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white font-bold text-slate-800 text-xs focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600">
+                        <select id="modal-smtp-preset" onchange="window.applySmtpPreset(this.value, true)" class="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white font-bold text-slate-800 text-xs focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600">
                             <option value="m365" ${initialPreset === 'm365' ? 'selected' : ''}>🏢 Microsoft 365 / Exchange Online (smtp.office365.com:587)</option>
                             <option value="google" ${initialPreset === 'google' ? 'selected' : ''}>🌐 Google Workspace / Gmail (smtp.gmail.com:587)</option>
                             <option value="custom_starttls" ${initialPreset === 'custom_starttls' ? 'selected' : ''}>⚙️ Servidor Personalizado (STARTTLS - Porta 587)</option>
@@ -4096,7 +4116,7 @@ async function openEditGatewayModal(type) {
             cancelButtonText: 'Cancelar',
             didOpen: () => {
                 lucide.createIcons();
-                window.applySmtpPreset(document.getElementById('modal-smtp-preset').value);
+                window.applySmtpPreset(document.getElementById('modal-smtp-preset').value, false);
             },
             preDeny: () => {
                 testChannelDirect('email');
