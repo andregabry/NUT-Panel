@@ -1379,6 +1379,29 @@ async function openAddServerModal(planId, serverId = null) {
 
     if (!s) return;
 
+    // 2. Mapeamento de instâncias já selecionadas como alvo em OUTROS planos ou alvos
+    // Chave: `${connectionId}:${type}:${id}` -> { planId, planName, serverName }
+    const assignedGuestsMap = new Map();
+    (allPlansData.plans || []).forEach(p => {
+        (p.servers || []).forEach(srv => {
+            // Ignora o próprio alvo que estamos a editar
+            if (p.id === planId && srv.id === serverId) {
+                return;
+            }
+            const srvConnId = srv.connection_id || '';
+            (srv.selected_guests || []).forEach(g => {
+                if (srvConnId && g.id) {
+                    const key = `${srvConnId}:${g.type || 'qemu'}:${g.id}`;
+                    assignedGuestsMap.set(key, {
+                        planId: p.id,
+                        planName: p.name,
+                        serverName: srv.name
+                    });
+                }
+            });
+        });
+    });
+
     // Determina valor inicial da seleção
     let initialRegValue = '';
     if (s.connection_id && s.connection_type) {
@@ -1583,7 +1606,7 @@ async function openAddServerModal(planId, serverId = null) {
                     <div class="pt-3 mt-2 border-t border-slate-200/60 space-y-2">
                         <label class="block text-[11px] font-bold text-slate-700">Comando Executado via SSH / Shell:</label>
                         <textarea id="swal-srv-cmd" rows="3" class="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-800 font-mono focus:outline-none focus:border-enging-orange leading-relaxed">${escapeHtml(s.custom_command || 'shutdown -h now')}</textarea>
-                        <p class="text-[10px] text-slate-400">O comando é montado automaticamente conforme você seleciona as instâncias acima.</p>
+                        <p class="text-[10px] text-slate-400">O comando é montado automaticamente conforme você seleciona as instâncias disponíveis acima.</p>
                     </div>
                 </details>
 
@@ -1647,7 +1670,8 @@ async function openAddServerModal(planId, serverId = null) {
                     return;
                 }
 
-                const checkedBoxes = Array.from(document.querySelectorAll('.guest-chk:checked'));
+                // Apenas caixas habilitadas e marcadas
+                const checkedBoxes = Array.from(document.querySelectorAll('.guest-chk:not(:disabled):checked'));
                 const checkedGuests = checkedBoxes.map(cb => ({
                     id: cb.dataset.id,
                     name: cb.dataset.name,
@@ -1708,7 +1732,8 @@ async function openAddServerModal(planId, serverId = null) {
             };
 
             window.selectAllGuests = (mode) => {
-                const boxes = document.querySelectorAll('.guest-chk');
+                // Apenas caixas habilitadas (não ocupadas em outros planos)
+                const boxes = document.querySelectorAll('.guest-chk:not(:disabled)');
                 boxes.forEach(cb => {
                     if (mode === 'running') {
                         cb.checked = (cb.dataset.status === 'running');
@@ -1824,96 +1849,169 @@ async function openAddServerModal(planId, serverId = null) {
                     // 1. VMs QEMU / VMware
                     if (vms.length > 0) {
                         itemsHtml += `
-                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 pt-1 flex items-center gap-1">
-                                <i data-lucide="box" class="w-3 h-3 text-blue-500"></i>
-                                <span>Máquinas Virtuais (${vms.length})</span>
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 pt-1 flex items-center justify-between">
+                                <span class="flex items-center gap-1">
+                                    <i data-lucide="box" class="w-3 h-3 text-blue-500"></i>
+                                    <span>Máquinas Virtuais (${vms.length})</span>
+                                </span>
+                                <span class="text-[9px] text-slate-400 font-mono">QEMU / ESXi</span>
                             </div>
                         `;
                         vms.forEach(g => {
+                            const guestKey = `${connId}:${g.type || 'qemu'}:${g.id}`;
+                            const assignedInfo = assignedGuestsMap.get(guestKey);
+                            const isAssigned = !!assignedInfo;
                             const isRunning = (g.status === 'running');
                             let isChecked = false;
-                            const key = `${g.type || 'qemu'}:${g.id}`;
-                            if (isEdit && previouslySelectedMap.has(key)) {
+
+                            if (isAssigned) {
+                                isChecked = false;
+                            } else if (isEdit && previouslySelectedMap.has(`${g.type || 'qemu'}:${g.id}`)) {
                                 isChecked = true;
                             } else if (!isEdit) {
                                 isChecked = isRunning; // por defeito marca apenas ativas
                             }
 
-                            itemsHtml += `
-                                <label class="guest-item-row flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition select-none" data-id="${g.id}" data-name="${escapeHtml(g.name)}">
-                                    <div class="flex items-center gap-2.5">
-                                        <input type="checkbox" class="guest-chk w-4 h-4 rounded text-enging-orange focus:ring-enging-orange border-slate-300" 
-                                               data-id="${g.id}" data-name="${escapeHtml(g.name)}" data-type="${g.type || 'qemu'}" data-status="${g.status}"
-                                               onchange="window.updateAutoCommand()" ${isChecked ? 'checked' : ''}>
-                                        <div>
-                                            <div class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                                                <span class="font-mono text-slate-400 font-semibold">[VM ${g.id}]</span>
-                                                <span>${escapeHtml(g.name)}</span>
-                                            </div>
-                                            <div class="text-[10px] text-slate-400 font-mono">
-                                                ${g.mem ? `Mem: ${g.mem}MB` : ''} ${g.disk ? `• Disco: ${g.disk}GB` : ''}
+                            if (isAssigned) {
+                                // INSTÂNCIA JÁ ATRIBUÍDA A OUTRO PLANO (NÃO SELECIONÁVEL)
+                                itemsHtml += `
+                                    <div class="guest-item-row flex items-center justify-between p-2 rounded-xl border border-dashed border-slate-300 bg-slate-100/70 opacity-60 select-none cursor-not-allowed" data-id="${g.id}" data-name="${escapeHtml(g.name)}" title="Esta VM já foi selecionada como alvo no plano '${escapeHtml(assignedInfo.planName)}'">
+                                        <div class="flex items-center gap-2.5">
+                                            <input type="checkbox" class="guest-chk w-4 h-4 rounded text-slate-300 border-slate-300 cursor-not-allowed" 
+                                                   data-id="${g.id}" data-name="${escapeHtml(g.name)}" data-type="${g.type || 'qemu'}" data-status="${g.status}"
+                                                   disabled>
+                                            <div>
+                                                <div class="font-bold text-slate-600 text-xs flex items-center gap-1.5">
+                                                    <span class="font-mono text-slate-400 font-semibold">[VM ${g.id}]</span>
+                                                    <span class="text-slate-500">${escapeHtml(g.name)}</span>
+                                                </div>
+                                                <div class="text-[10px] text-amber-700 font-medium flex items-center gap-1 mt-0.5">
+                                                    <i data-lucide="lock" class="w-3 h-3 text-amber-600 inline"></i>
+                                                    <span>Alvo no plano: <strong>${escapeHtml(assignedInfo.planName)}</strong></span>
+                                                </div>
                                             </div>
                                         </div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                                🔒 Ocupada
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                            ${g.type === 'vmware_vm' ? 'ESXi' : 'QEMU'}
-                                        </span>
-                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold ${isRunning ? 'text-emerald-700' : 'text-slate-400'}">
-                                            <span class="w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}"></span>
-                                            ${isRunning ? 'Ativa' : 'Parada'}
-                                        </span>
-                                    </div>
-                                </label>
-                            `;
+                                `;
+                            } else {
+                                // INSTÂNCIA DISPONÍVEL
+                                itemsHtml += `
+                                    <label class="guest-item-row flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition select-none" data-id="${g.id}" data-name="${escapeHtml(g.name)}">
+                                        <div class="flex items-center gap-2.5">
+                                            <input type="checkbox" class="guest-chk w-4 h-4 rounded text-enging-orange focus:ring-enging-orange border-slate-300" 
+                                                   data-id="${g.id}" data-name="${escapeHtml(g.name)}" data-type="${g.type || 'qemu'}" data-status="${g.status}"
+                                                   onchange="window.updateAutoCommand()" ${isChecked ? 'checked' : ''}>
+                                            <div>
+                                                <div class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                                    <span class="font-mono text-slate-400 font-semibold">[VM ${g.id}]</span>
+                                                    <span>${escapeHtml(g.name)}</span>
+                                                </div>
+                                                <div class="text-[10px] text-slate-400 font-mono">
+                                                    ${g.mem ? `Mem: ${g.mem}MB` : ''} ${g.disk ? `• Disco: ${g.disk}GB` : ''}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                ${g.type === 'vmware_vm' ? 'ESXi' : 'QEMU'}
+                                            </span>
+                                            <span class="inline-flex items-center gap-1 text-[10px] font-bold ${isRunning ? 'text-emerald-700' : 'text-slate-400'}">
+                                                <span class="w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}"></span>
+                                                ${isRunning ? 'Ativa' : 'Parada'}
+                                            </span>
+                                        </div>
+                                    </label>
+                                `;
+                            }
                         });
                     }
 
                     // 2. Containers LXC (Proxmox)
                     if (cts.length > 0) {
                         itemsHtml += `
-                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 pt-2 flex items-center gap-1">
-                                <i data-lucide="layers" class="w-3 h-3 text-purple-500"></i>
-                                <span>Containers LXC (${cts.length})</span>
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 pt-2 flex items-center justify-between">
+                                <span class="flex items-center gap-1">
+                                    <i data-lucide="layers" class="w-3 h-3 text-purple-500"></i>
+                                    <span>Containers LXC (${cts.length})</span>
+                                </span>
+                                <span class="text-[9px] text-purple-400 font-mono">LXC</span>
                             </div>
                         `;
                         cts.forEach(g => {
+                            const guestKey = `${connId}:lxc:${g.id}`;
+                            const assignedInfo = assignedGuestsMap.get(guestKey);
+                            const isAssigned = !!assignedInfo;
                             const isRunning = (g.status === 'running');
                             let isChecked = false;
-                            const key = `lxc:${g.id}`;
-                            if (isEdit && previouslySelectedMap.has(key)) {
+
+                            if (isAssigned) {
+                                isChecked = false;
+                            } else if (isEdit && previouslySelectedMap.has(`lxc:${g.id}`)) {
                                 isChecked = true;
                             } else if (!isEdit) {
                                 isChecked = isRunning;
                             }
 
-                            itemsHtml += `
-                                <label class="guest-item-row flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition select-none" data-id="${g.id}" data-name="${escapeHtml(g.name)}">
-                                    <div class="flex items-center gap-2.5">
-                                        <input type="checkbox" class="guest-chk w-4 h-4 rounded text-enging-orange focus:ring-enging-orange border-slate-300" 
-                                               data-id="${g.id}" data-name="${escapeHtml(g.name)}" data-type="lxc" data-status="${g.status}"
-                                               onchange="window.updateAutoCommand()" ${isChecked ? 'checked' : ''}>
-                                        <div>
-                                            <div class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                                                <span class="font-mono text-purple-400 font-semibold">[CT ${g.id}]</span>
-                                                <span>${escapeHtml(g.name)}</span>
-                                            </div>
-                                            <div class="text-[10px] text-slate-400 font-mono">
-                                                LXC Container ${g.lock ? `• Lock: ${escapeHtml(g.lock)}` : ''}
+                            if (isAssigned) {
+                                // CONTAINER JÁ ATRIBUÍDO A OUTRO PLANO (NÃO SELECIONÁVEL)
+                                itemsHtml += `
+                                    <div class="guest-item-row flex items-center justify-between p-2 rounded-xl border border-dashed border-slate-300 bg-slate-100/70 opacity-60 select-none cursor-not-allowed" data-id="${g.id}" data-name="${escapeHtml(g.name)}" title="Este container já foi selecionado como alvo no plano '${escapeHtml(assignedInfo.planName)}'">
+                                        <div class="flex items-center gap-2.5">
+                                            <input type="checkbox" class="guest-chk w-4 h-4 rounded text-slate-300 border-slate-300 cursor-not-allowed" 
+                                                   data-id="${g.id}" data-name="${escapeHtml(g.name)}" data-type="lxc" data-status="${g.status}"
+                                                   disabled>
+                                            <div>
+                                                <div class="font-bold text-slate-600 text-xs flex items-center gap-1.5">
+                                                    <span class="font-mono text-purple-400 font-semibold">[CT ${g.id}]</span>
+                                                    <span class="text-slate-500">${escapeHtml(g.name)}</span>
+                                                </div>
+                                                <div class="text-[10px] text-amber-700 font-medium flex items-center gap-1 mt-0.5">
+                                                    <i data-lucide="lock" class="w-3 h-3 text-amber-600 inline"></i>
+                                                    <span>Alvo no plano: <strong>${escapeHtml(assignedInfo.planName)}</strong></span>
+                                                </div>
                                             </div>
                                         </div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                                🔒 Ocupado
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                            LXC
-                                        </span>
-                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold ${isRunning ? 'text-emerald-700' : 'text-slate-400'}">
-                                            <span class="w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}"></span>
-                                            ${isRunning ? 'Ativo' : 'Parado'}
-                                        </span>
-                                    </div>
-                                </label>
-                            `;
+                                `;
+                            } else {
+                                itemsHtml += `
+                                    <label class="guest-item-row flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition select-none" data-id="${g.id}" data-name="${escapeHtml(g.name)}">
+                                        <div class="flex items-center gap-2.5">
+                                            <input type="checkbox" class="guest-chk w-4 h-4 rounded text-enging-orange focus:ring-enging-orange border-slate-300" 
+                                                   data-id="${g.id}" data-name="${escapeHtml(g.name)}" data-type="lxc" data-status="${g.status}"
+                                                   onchange="window.updateAutoCommand()" ${isChecked ? 'checked' : ''}>
+                                            <div>
+                                                <div class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                                    <span class="font-mono text-purple-400 font-semibold">[CT ${g.id}]</span>
+                                                    <span>${escapeHtml(g.name)}</span>
+                                                </div>
+                                                <div class="text-[10px] text-slate-400 font-mono">
+                                                    LXC Container ${g.lock ? `• Lock: ${escapeHtml(g.lock)}` : ''}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                                LXC
+                                            </span>
+                                            <span class="inline-flex items-center gap-1 text-[10px] font-bold ${isRunning ? 'text-emerald-700' : 'text-slate-400'}">
+                                                <span class="w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}"></span>
+                                                ${isRunning ? 'Ativo' : 'Parado'}
+                                            </span>
+                                        </div>
+                                    </label>
+                                `;
+                            }
                         });
                     }
 
@@ -1999,7 +2097,7 @@ async function openAddServerModal(planId, serverId = null) {
 
             // Proxmox ou VMware
             const [connType, connId] = regVal.split(':');
-            const checkedBoxes = Array.from(document.querySelectorAll('.guest-chk:checked'));
+            const checkedBoxes = Array.from(document.querySelectorAll('.guest-chk:not(:disabled):checked'));
             const selectedGuests = checkedBoxes.map(cb => ({
                 id: cb.dataset.id,
                 name: cb.dataset.name,

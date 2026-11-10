@@ -250,6 +250,25 @@ class ShutdownManager:
                 raise ValueError("Plano não encontrado")
             
             server_id = server_payload.get("id")
+            conn_id = server_payload.get("connection_id")
+            new_guests = server_payload.get("selected_guests", [])
+
+            # Validar que nenhuma VM/CT já está atribuída a outro plano ou alvo
+            if conn_id and new_guests:
+                for other_plan in self.data.get("plans", []):
+                    for other_srv in other_plan.get("servers", []):
+                        # Ignora o próprio alvo que está sendo editado
+                        if other_plan["id"] == plan_id and other_srv.get("id") == server_id:
+                            continue
+                        if other_srv.get("connection_id") == conn_id:
+                            for og in other_srv.get("selected_guests", []):
+                                for ng in new_guests:
+                                    if str(ng.get("id")) == str(og.get("id")) and ng.get("type", "qemu") == og.get("type", "qemu"):
+                                        target_name = ng.get("name") or ng.get("id")
+                                        raise ValueError(
+                                            f"A VM/CT '{target_name}' (ID: {ng.get('id')}) já foi selecionada como alvo no plano '{other_plan.get('name')}'."
+                                        )
+
             if not server_id:
                 server_id = str(uuid.uuid4())
                 server_payload["id"] = server_id
