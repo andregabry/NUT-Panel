@@ -1380,21 +1380,17 @@ async function openAddServerModal(planId, serverId = null) {
     if (!s) return;
 
     // Determina valor inicial da seleção
-    let initialRegValue = 'manual';
+    let initialRegValue = '';
     if (s.connection_id && s.connection_type) {
         initialRegValue = `${s.connection_type}:${s.connection_id}`;
     } else if (s.method === 'local_command') {
         initialRegValue = 'local:nut';
-    } else if (!isEdit) {
-        if (proxmoxServers.length > 0) {
-            initialRegValue = `proxmox:${proxmoxServers[0].id}`;
-        } else if (vmwareServers.length > 0) {
-            initialRegValue = `vmware:${vmwareServers[0].id}`;
-        }
+    } else if (isEdit) {
+        initialRegValue = 'manual';
     }
 
     // Monta opções do dropdown agrupado
-    let optHtml = '';
+    let optHtml = `<option value="" disabled ${!initialRegValue ? 'selected' : ''}>-- Escolha o Hipervisor ou Servidor --</option>`;
     if (proxmoxServers.length > 0) {
         optHtml += '<optgroup label="Proxmox VE (Clusters & Nós SSH)">';
         proxmoxServers.forEach(p => {
@@ -1417,7 +1413,7 @@ async function openAddServerModal(planId, serverId = null) {
     optHtml += `<option value="local:nut" ${initialRegValue === 'local:nut' ? 'selected' : ''}>⚡ ${escapeHtml(nutLocal.name)}</option>`;
     optHtml += '</optgroup>';
 
-    optHtml += '<optgroup label="Configuração Manual">';
+    optHtml += '<optgroup label="Configuração Manual / Outro">';
     optHtml += `<option value="manual" ${initialRegValue === 'manual' ? 'selected' : ''}>⚙️ Configuração Manual (Outro Host / Webhook)</option>`;
     optHtml += '</optgroup>';
 
@@ -1427,29 +1423,38 @@ async function openAddServerModal(planId, serverId = null) {
         html: `
             <div class="text-left space-y-3.5 mt-2 font-sans text-xs">
                 
-                <!-- 1. SELEÇÃO DE SERVIDOR CADASTRADO -->
+                <!-- 1. SELEÇÃO DE SERVIDOR / HIPERVISOR CADASTRADO -->
                 <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
                     <div class="flex items-center justify-between">
                         <label class="block font-bold text-slate-800 text-xs flex items-center gap-1.5">
                             <i data-lucide="server" class="w-4 h-4 text-enging-orange"></i>
-                            <span>1. Selecionar Servidor Cadastrado (Conexões & APIs)</span>
+                            <span>1. Selecionar Hipervisor / Servidor Cadastrado</span>
                         </label>
-                        <span class="text-[10px] text-slate-400 font-mono">Infraestrutura</span>
+                        <span class="text-[10px] text-slate-400 font-mono">Conexões & APIs</span>
                     </div>
                     <select id="swal-srv-registered" onchange="window.onRegisteredServerChange()" class="w-full px-3.5 py-2.5 text-xs rounded-xl bg-white border border-slate-300 font-bold text-slate-900 focus:outline-none focus:border-enging-orange focus:ring-1 focus:ring-enging-orange">
                         ${optHtml}
                     </select>
                 </div>
 
+                <!-- PROMPT INICIAL (QUANDO NENHUM HIPERVISOR ESTÁ SELECIONADO) -->
+                <div id="swal-guests-empty-prompt" class="p-6 text-center text-slate-500 rounded-2xl bg-slate-50 border border-dashed border-slate-300 space-y-2 ${initialRegValue ? 'hidden' : ''}">
+                    <i data-lucide="layers" class="w-8 h-8 mx-auto text-slate-400"></i>
+                    <p class="font-bold text-slate-700 text-xs">Selecione o Hipervisor no campo acima</p>
+                    <p class="text-[11px] text-slate-500 leading-relaxed max-w-md mx-auto">
+                        Ao selecionar um nó <strong>Proxmox VE</strong> ou host <strong>VMware ESXi</strong> cadastrado, suas Máquinas Virtuais (VMs) e Containers (CTs) serão listados para você escolher quais deseja desligar.
+                    </p>
+                </div>
+
                 <!-- 2. GUESTS (VMs e CTs) - Carregado via SSH para Proxmox/VMware -->
-                <div id="swal-guests-box" class="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-xs">
+                <div id="swal-guests-box" class="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-xs ${initialRegValue && (initialRegValue.startsWith('proxmox:') || initialRegValue.startsWith('vmware:')) ? '' : 'hidden'}">
                     <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
                         <div>
                             <span class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                                 <i data-lucide="boxes" class="w-4 h-4 text-enging-navy"></i>
-                                <span>2. Selecionar Máquinas Virtuais (VMs) e Containers (CTs)</span>
+                                <span>2. Escolher VMs e CTs para Desligamento</span>
                             </span>
-                            <span class="text-[11px] text-slate-500 block mt-0.5">Marque as instâncias que deverão ser desligadas por este plano</span>
+                            <span class="text-[11px] text-slate-500 block mt-0.5">Selecione quais instâncias serão desligadas por este plano</span>
                         </div>
                         <span id="swal-guests-count-badge" class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono text-[10px] font-bold">
                             0 selecionadas
@@ -1468,16 +1473,19 @@ async function openAddServerModal(planId, serverId = null) {
                             <button type="button" onclick="window.selectAllGuests('none')" class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-200 font-medium text-[11px] transition">
                                 Desmarcar
                             </button>
+                            <button type="button" onclick="window.onRegisteredServerChange(true)" title="Recarregar lista via SSH" class="p-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 transition flex items-center gap-1 text-[11px] font-medium">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Atualizar
+                            </button>
                         </div>
-                        <div class="w-44">
+                        <div class="w-40">
                             <input type="text" id="swal-guests-search" oninput="window.filterGuestsList()" placeholder="Filtrar por nome/ID..." class="w-full px-2.5 py-1 text-[11px] rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none focus:border-enging-orange">
                         </div>
                     </div>
 
                     <!-- Loading Spinner -->
-                    <div id="swal-guests-loading" class="py-6 flex flex-col items-center justify-center gap-2 text-slate-500">
+                    <div id="swal-guests-loading" class="py-6 flex flex-col items-center justify-center gap-2 text-slate-500 hidden">
                         <i data-lucide="loader-2" class="w-6 h-6 animate-spin text-enging-orange"></i>
-                        <span class="text-xs font-medium">Consultando VMs e CTs no nó via SSH...</span>
+                        <span id="swal-guests-loading-text" class="text-xs font-medium">A consultar VMs e CTs no hipervisor via SSH...</span>
                     </div>
 
                     <!-- Error Alert -->
@@ -1490,16 +1498,16 @@ async function openAddServerModal(planId, serverId = null) {
                     <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
                         <label for="swal-srv-shutdown-host" class="flex items-center gap-2 cursor-pointer select-none">
                             <input type="checkbox" id="swal-srv-shutdown-host" onchange="window.updateAutoCommand()" ${s.shutdown_host ? 'checked' : ''} class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300">
-                            <span class="font-bold text-slate-800 text-xs">Desligar também o Host / Servidor Físico após as VMs/CTs</span>
+                            <span class="font-bold text-slate-800 text-xs">Desligar também o Hipervisor físico após as VMs/CTs</span>
                         </label>
-                        <span class="text-[10px] text-slate-400 font-mono">(shutdown -h now)</span>
+                        <span class="text-[10px] text-slate-400 font-mono">(poweroff / shutdown)</span>
                     </div>
                 </div>
 
                 <!-- 3. IDENTIFICAÇÃO DO ALVO & DELAY -->
                 <div class="grid grid-cols-3 gap-3">
                     <div class="col-span-2">
-                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Alvo / VM</label>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Alvo</label>
                         <input id="swal-srv-name" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-enging-orange" placeholder="Ex: SuperMicro - VMs & CTs" value="${escapeHtml(s.name)}">
                     </div>
                     <div>
@@ -1509,7 +1517,7 @@ async function openAddServerModal(planId, serverId = null) {
                 </div>
 
                 <!-- 4. CAMPOS MANUAIS (SSH / WEBHOOK) - Visíveis apenas em Modo Manual -->
-                <div id="manual-fields" class="space-y-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hidden">
+                <div id="manual-fields" class="space-y-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 ${initialRegValue === 'manual' ? '' : 'hidden'}">
                     <div class="font-bold text-slate-800 text-xs flex items-center gap-1.5 border-b border-slate-200/60 pb-1.5">
                         <i data-lucide="terminal" class="w-4 h-4 text-slate-600"></i>
                         <span>Parâmetros de Conexão Manual</span>
@@ -1575,7 +1583,7 @@ async function openAddServerModal(planId, serverId = null) {
                     <div class="pt-3 mt-2 border-t border-slate-200/60 space-y-2">
                         <label class="block text-[11px] font-bold text-slate-700">Comando Executado via SSH / Shell:</label>
                         <textarea id="swal-srv-cmd" rows="3" class="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-800 font-mono focus:outline-none focus:border-enging-orange leading-relaxed">${escapeHtml(s.custom_command || 'shutdown -h now')}</textarea>
-                        <p class="text-[10px] text-slate-400">O comando é montado automaticamente conforme você marca/desmarca as VMs e CTs acima.</p>
+                        <p class="text-[10px] text-slate-400">O comando é montado automaticamente conforme você seleciona as instâncias acima.</p>
                     </div>
                 </details>
 
@@ -1589,6 +1597,7 @@ async function openAddServerModal(planId, serverId = null) {
             lucide.createIcons();
 
             let currentGuests = [];
+            let currentServerName = '';
             const previouslySelectedMap = new Map();
             if (isEdit && s.selected_guests && s.selected_guests.length > 0) {
                 s.selected_guests.forEach(g => {
@@ -1628,12 +1637,13 @@ async function openAddServerModal(planId, serverId = null) {
             };
 
             window.updateAutoCommand = () => {
-                const regVal = document.getElementById('swal-srv-registered')?.value || 'manual';
+                const regVal = document.getElementById('swal-srv-registered')?.value || '';
                 const shutdownHost = document.getElementById('swal-srv-shutdown-host')?.checked || false;
                 const cmdTextarea = document.getElementById('swal-srv-cmd');
                 const badge = document.getElementById('swal-guests-count-badge');
+                const nameInput = document.getElementById('swal-srv-name');
 
-                if (regVal === 'manual' || regVal === 'local:nut') {
+                if (!regVal || regVal === 'manual' || regVal === 'local:nut') {
                     return;
                 }
 
@@ -1650,6 +1660,12 @@ async function openAddServerModal(planId, serverId = null) {
                     badge.className = checkedGuests.length > 0 
                         ? 'px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold'
                         : 'px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-mono text-[10px] font-bold';
+                }
+
+                if (nameInput && (!nameInput.value || nameInput.value.includes('Proxmox') || nameInput.value.includes('VMware') || nameInput.value.includes('Alvo') || !isEdit)) {
+                    if (currentServerName) {
+                        nameInput.value = `${currentServerName} - ${checkedGuests.length} Instância(s)`;
+                    }
                 }
 
                 let cmds = [];
@@ -1705,11 +1721,13 @@ async function openAddServerModal(planId, serverId = null) {
                 window.updateAutoCommand();
             };
 
-            window.onRegisteredServerChange = async () => {
-                const regVal = document.getElementById('swal-srv-registered')?.value || 'manual';
+            window.onRegisteredServerChange = async (forceRefresh = false) => {
+                const regVal = document.getElementById('swal-srv-registered')?.value || '';
+                const emptyPrompt = document.getElementById('swal-guests-empty-prompt');
                 const guestsBox = document.getElementById('swal-guests-box');
                 const manualFields = document.getElementById('manual-fields');
                 const loadingEl = document.getElementById('swal-guests-loading');
+                const loadText = document.getElementById('swal-guests-loading-text');
                 const errorEl = document.getElementById('swal-guests-error');
                 const listEl = document.getElementById('swal-guests-list');
                 const nameInput = document.getElementById('swal-srv-name');
@@ -1717,10 +1735,20 @@ async function openAddServerModal(planId, serverId = null) {
 
                 if (errorEl) errorEl.classList.add('hidden');
 
+                if (!regVal) {
+                    if (emptyPrompt) emptyPrompt.classList.remove('hidden');
+                    if (guestsBox) guestsBox.classList.add('hidden');
+                    if (manualFields) manualFields.classList.add('hidden');
+                    return;
+                }
+
+                if (emptyPrompt) emptyPrompt.classList.add('hidden');
+
                 if (regVal === 'manual') {
                     if (guestsBox) guestsBox.classList.add('hidden');
                     if (manualFields) manualFields.classList.remove('hidden');
                     window.toggleManualMethodFields();
+                    lucide.createIcons();
                     return;
                 }
 
@@ -1743,8 +1771,19 @@ async function openAddServerModal(planId, serverId = null) {
                 const [connType, connId] = regVal.split(':');
                 const isProxmox = (connType === 'proxmox');
                 const endpoint = isProxmox 
-                    ? `/api/connections/proxmox/${connId}/guests` 
-                    : `/api/connections/vmware/${connId}/guests`;
+                    ? `/api/connections/proxmox/${connId}/guests${forceRefresh ? '?refresh=1' : ''}` 
+                    : `/api/connections/vmware/${connId}/guests${forceRefresh ? '?refresh=1' : ''}`;
+
+                let targetSrvName = 'Hipervisor';
+                if (isProxmox) {
+                    const found = proxmoxServers.find(p => p.id === connId);
+                    if (found) targetSrvName = found.name;
+                } else {
+                    const found = vmwareServers.find(v => v.id === connId);
+                    if (found) targetSrvName = found.name;
+                }
+                currentServerName = targetSrvName;
+                if (loadText) loadText.innerText = `A consultar VMs e CTs em ${targetSrvName} via SSH...`;
 
                 try {
                     const res = await fetch(endpoint);
@@ -1764,7 +1803,7 @@ async function openAddServerModal(planId, serverId = null) {
                     currentGuests = [...vms, ...cts];
 
                     if (nameInput && (!nameInput.value || nameInput.value.includes('Proxmox') || nameInput.value.includes('VMware') || !isEdit)) {
-                        nameInput.value = `${data.server?.name || 'Servidor'} - VMs e CTs`;
+                        nameInput.value = `${data.server?.name || targetSrvName} - VMs e CTs`;
                     }
 
                     if (currentGuests.length === 0) {
@@ -1801,7 +1840,7 @@ async function openAddServerModal(planId, serverId = null) {
                             }
 
                             itemsHtml += `
-                                <label class="guest-item-row flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition" data-id="${g.id}" data-name="${escapeHtml(g.name)}">
+                                <label class="guest-item-row flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition select-none" data-id="${g.id}" data-name="${escapeHtml(g.name)}">
                                     <div class="flex items-center gap-2.5">
                                         <input type="checkbox" class="guest-chk w-4 h-4 rounded text-enging-orange focus:ring-enging-orange border-slate-300" 
                                                data-id="${g.id}" data-name="${escapeHtml(g.name)}" data-type="${g.type || 'qemu'}" data-status="${g.status}"
@@ -1849,7 +1888,7 @@ async function openAddServerModal(planId, serverId = null) {
                             }
 
                             itemsHtml += `
-                                <label class="guest-item-row flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition" data-id="${g.id}" data-name="${escapeHtml(g.name)}">
+                                <label class="guest-item-row flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition select-none" data-id="${g.id}" data-name="${escapeHtml(g.name)}">
                                     <div class="flex items-center gap-2.5">
                                         <input type="checkbox" class="guest-chk w-4 h-4 rounded text-enging-orange focus:ring-enging-orange border-slate-300" 
                                                data-id="${g.id}" data-name="${escapeHtml(g.name)}" data-type="lxc" data-status="${g.status}"
@@ -1894,14 +1933,21 @@ async function openAddServerModal(planId, serverId = null) {
                 }
             };
 
-            // Dispara inicialização
-            window.onRegisteredServerChange();
+            // Dispara inicialização se já houver um valor selecionado (ex: na edição)
+            if (initialRegValue) {
+                window.onRegisteredServerChange();
+            }
         },
         preConfirm: () => {
-            const regVal = document.getElementById('swal-srv-registered')?.value || 'manual';
+            const regVal = document.getElementById('swal-srv-registered')?.value || '';
             const nameInput = document.getElementById('swal-srv-name')?.value.trim() || '';
             const delay_sec = parseInt(document.getElementById('swal-srv-delay')?.value) || 0;
             const shutdownHost = document.getElementById('swal-srv-shutdown-host')?.checked || false;
+
+            if (!regVal) {
+                Swal.showValidationMessage('Por favor selecione um Hipervisor ou Servidor cadastrado.');
+                return false;
+            }
 
             let payload = {
                 id: s.id || undefined,
@@ -1962,7 +2008,7 @@ async function openAddServerModal(planId, serverId = null) {
             }));
 
             if (selectedGuests.length === 0 && !shutdownHost) {
-                Swal.showValidationMessage('Por favor selecione pelo menos uma VM/CT para desligar ou marque para desligar o Host.');
+                Swal.showValidationMessage('Por favor selecione pelo menos uma VM/CT para desligar ou marque para desligar o Hipervisor.');
                 return false;
             }
 

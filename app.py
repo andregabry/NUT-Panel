@@ -448,12 +448,14 @@ def get_connections_servers_summary():
 @app.route("/api/connections/proxmox/<server_id>/guests", methods=["GET"])
 @login_required
 def get_proxmox_guests_endpoint(server_id):
-    return jsonify(connections_manager.get_proxmox_guests(server_id))
+    force_refresh = request.args.get("refresh") == "1"
+    return jsonify(connections_manager.get_proxmox_guests(server_id, force_refresh=force_refresh))
 
 @app.route("/api/connections/vmware/<server_id>/guests", methods=["GET"])
 @login_required
 def get_vmware_guests_endpoint(server_id):
-    return jsonify(connections_manager.get_vmware_guests(server_id))
+    force_refresh = request.args.get("refresh") == "1"
+    return jsonify(connections_manager.get_vmware_guests(server_id, force_refresh=force_refresh))
 
 # Endpoint de API REST Externa v1 com suporte a Token Bearer
 @app.route("/api/v1/status", methods=["GET"])

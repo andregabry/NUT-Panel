@@ -356,7 +356,7 @@ class ShutdownManager:
             try:
                 username = server.get("username", "root")
                 password = server.get("password") or None
-                connect_kwargs = {"hostname": host, "port": port, "username": username, "timeout": 6}
+                connect_kwargs = {"hostname": host, "port": port, "username": username, "timeout": 35}
                 if server.get("private_key"):
                     import io
                     try:
@@ -368,7 +368,7 @@ class ShutdownManager:
                 ssh.connect(**connect_kwargs)
                 
                 test_cmd = "hostname && uname -a" if method == "ssh" else "hostname"
-                stdin, stdout, stderr = ssh.exec_command(test_cmd, timeout=5)
+                stdin, stdout, stderr = ssh.exec_command(test_cmd, timeout=15)
                 output = stdout.read().decode('utf-8', errors='replace').strip()
                 ssh.close()
                 
@@ -445,7 +445,7 @@ class ShutdownManager:
             try:
                 username = server.get("username", "root")
                 password = server.get("password") or None
-                connect_kwargs = {"hostname": host, "port": port, "username": username, "timeout": 8}
+                connect_kwargs = {"hostname": host, "port": port, "username": username, "timeout": 35}
                 if server.get("private_key"):
                     import io
                     try:

@@ -21,6 +21,7 @@ class ConnectionsManager:
     def __init__(self, data_file: str = CONNECTIONS_FILE):
         self.data_file = data_file
         self.lock = threading.Lock()
+        self._guests_cache = {}
         self._load_data()
 
     def _get_default_data(self) -> Dict[str, Any]:
@@ -605,8 +606,13 @@ class ConnectionsManager:
                 }
         return None
 
-    def get_proxmox_guests(self, server_id: str) -> Dict[str, Any]:
+    def get_proxmox_guests(self, server_id: str, force_refresh: bool = False) -> Dict[str, Any]:
         """Consulta via SSH ao Proxmox as VMs (QEMU) e CTs (LXC) ativas e configuradas."""
+        cache_key = f"proxmox:{server_id}"
+        if not force_refresh and cache_key in self._guests_cache:
+            entry = self._guests_cache[cache_key]
+            if time.time() - entry.get("timestamp", 0) < 90:
+                return entry["data"]
         server = None
         with self.lock:
             for s in self.data.get("proxmox_servers", []):
@@ -635,7 +641,7 @@ class ConnectionsManager:
                 "hostname": host,
                 "port": port,
                 "username": username,
-                "timeout": 7
+                "timeout": 35
             }
             if auth_type == "key" and private_key_str:
                 import io
@@ -702,7 +708,7 @@ class ConnectionsManager:
                         "type": "lxc"
                     })
 
-            return {
+            result_data = {
                 "success": True,
                 "server": {
                     "id": server_id,
@@ -717,6 +723,8 @@ class ConnectionsManager:
                 "running_vms": sum(1 for v in vms if v["status"] == "running"),
                 "running_cts": sum(1 for c in cts if c["status"] == "running")
             }
+            self._guests_cache[cache_key] = {"timestamp": time.time(), "data": result_data}
+            return result_data
 
         except Exception as e:
             return {
@@ -726,8 +734,13 @@ class ConnectionsManager:
                 "message": f"Erro ao comunicar com {server.get('name')} ({host}): {str(e)}"
             }
 
-    def get_vmware_guests(self, server_id: str) -> Dict[str, Any]:
+    def get_vmware_guests(self, server_id: str, force_refresh: bool = False) -> Dict[str, Any]:
         """Consulta via SSH ao VMware ESXi as VMs registradas e seus estados de execucao."""
+        cache_key = f"vmware:{server_id}"
+        if not force_refresh and cache_key in self._guests_cache:
+            entry = self._guests_cache[cache_key]
+            if time.time() - entry.get("timestamp", 0) < 90:
+                return entry["data"]
         server = None
         with self.lock:
             for s in self.data.get("vmware_servers", []):
@@ -781,7 +794,7 @@ class ConnectionsManager:
                         "type": "vmware_vm"
                     })
 
-            return {
+            result_data = {
                 "success": True,
                 "server": {
                     "id": server_id,
@@ -796,6 +809,8 @@ class ConnectionsManager:
                 "running_vms": sum(1 for v in vms if v["status"] == "running"),
                 "running_cts": 0
             }
+            self._guests_cache[cache_key] = {"timestamp": time.time(), "data": result_data}
+            return result_data
 
         except Exception as e:
             return {
