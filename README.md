@@ -1,5 +1,9 @@
 # ⚡ NUT Panel - UPS Management & Automation System
 
+## Visão geral para o portefólio
+
+Painel web de monitorização de UPS com Network UPS Tools. Demonstra atualizações em tempo real via SSE, integração com uma API REST e orquestração do encerramento controlado de hosts. Valide os fluxos de encerramento num ambiente isolado antes de ligar equipamentos reais.
+
 <div align="center">
   <h3><strong>Modern, Real-Time UPS Monitoring, Infrastructure Automation & Multi-Channel Alert Gateway</strong></h3>
   <p><em>Built on <strong>Network UPS Tools (NUT)</strong> • Real-Time SSE Synoptic Power Flow • Proxmox VE (SSH CLI) & VMware ESXi Graceful Shutdown • WhatsApp (Baileys MD), Microsoft Teams, Google Chat, SMS & SMTP Alerts</em></p>
