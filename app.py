@@ -34,6 +34,7 @@ shutdown_manager = ShutdownManager()
 auth_manager = AuthManager()
 alert_manager = AlertManager()
 connections_manager = ConnectionsManager()
+shutdown_manager.connections_manager = connections_manager
 
 latest_data = {
     "connected": False,
@@ -437,6 +438,22 @@ def generate_api_token():
 def delete_api_token(token_id):
     success = connections_manager.delete_api_token(token_id)
     return jsonify({"success": success})
+
+# Endpoints de Servidores e Guests (VMs / CTs) para Planos de Desligamento
+@app.route("/api/connections/servers-summary", methods=["GET"])
+@login_required
+def get_connections_servers_summary():
+    return jsonify(connections_manager.get_registered_servers())
+
+@app.route("/api/connections/proxmox/<server_id>/guests", methods=["GET"])
+@login_required
+def get_proxmox_guests_endpoint(server_id):
+    return jsonify(connections_manager.get_proxmox_guests(server_id))
+
+@app.route("/api/connections/vmware/<server_id>/guests", methods=["GET"])
+@login_required
+def get_vmware_guests_endpoint(server_id):
+    return jsonify(connections_manager.get_vmware_guests(server_id))
 
 # Endpoint de API REST Externa v1 com suporte a Token Bearer
 @app.route("/api/v1/status", methods=["GET"])

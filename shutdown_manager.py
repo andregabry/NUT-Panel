@@ -298,8 +298,31 @@ class ShutdownManager:
             self.add_log_unlocked(level, message, server_name, details)
             self._save_data_unlocked()
 
+    def _resolve_server_credentials(self, server: Dict[str, Any]) -> Dict[str, Any]:
+        """Resolve credenciais herdadas do connections_manager se houver connection_id."""
+        s = dict(server)
+        conn_id = s.get("connection_id")
+        conn_type = s.get("connection_type", "proxmox")
+        if conn_id and getattr(self, "connections_manager", None):
+            creds = self.connections_manager.get_server_credentials(conn_type, conn_id)
+            if creds:
+                if not s.get("host") or s.get("host") == "127.0.0.1":
+                    s["host"] = creds.get("host", s.get("host"))
+                if not s.get("port"):
+                    s["port"] = creds.get("port", 22)
+                if not s.get("username"):
+                    s["username"] = creds.get("username", "root")
+                if not s.get("password") or s.get("password") == "••••••••":
+                    s["password"] = creds.get("password", "")
+                if "private_key" in creds and not s.get("private_key"):
+                    s["private_key"] = creds.get("private_key", "")
+                if "sudo" in creds and "sudo" not in s:
+                    s["sudo"] = creds.get("sudo", False)
+        return s
+
     def test_connection(self, server: Dict[str, Any]) -> Dict[str, Any]:
         """Testa conexão ao servidor ou VM sem desligar."""
+        server = self._resolve_server_credentials(server)
         method = server.get("method", "ssh")
         host = server.get("host", "").strip()
         port = int(server.get("port", 22))
@@ -333,7 +356,16 @@ class ShutdownManager:
             try:
                 username = server.get("username", "root")
                 password = server.get("password") or None
-                ssh.connect(host, port=port, username=username, password=password, timeout=6)
+                connect_kwargs = {"hostname": host, "port": port, "username": username, "timeout": 6}
+                if server.get("private_key"):
+                    import io
+                    try:
+                        connect_kwargs["pkey"] = paramiko.RSAKey.from_private_key(io.StringIO(server["private_key"]))
+                    except Exception:
+                        connect_kwargs["pkey"] = paramiko.Ed25519Key.from_private_key(io.StringIO(server["private_key"]))
+                elif password:
+                    connect_kwargs["password"] = password
+                ssh.connect(**connect_kwargs)
                 
                 test_cmd = "hostname && uname -a" if method == "ssh" else "hostname"
                 stdin, stdout, stderr = ssh.exec_command(test_cmd, timeout=5)
@@ -377,7 +409,9 @@ class ShutdownManager:
 
     def execute_shutdown_server(self, server: Dict[str, Any], plan_name: str = "", dry_run: bool = False) -> Dict[str, Any]:
         """Executa a ordem de desligamento para um servidor específico."""
+        server = self._resolve_server_credentials(server)
         name = server.get("name", "Servidor")
+        server = self._resolve_server_credentials(server)
         method = server.get("method", "ssh")
         host = server.get("host", "").strip()
         port = int(server.get("port", 22))
@@ -411,7 +445,16 @@ class ShutdownManager:
             try:
                 username = server.get("username", "root")
                 password = server.get("password") or None
-                ssh.connect(host, port=port, username=username, password=password, timeout=8)
+                connect_kwargs = {"hostname": host, "port": port, "username": username, "timeout": 8}
+                if server.get("private_key"):
+                    import io
+                    try:
+                        connect_kwargs["pkey"] = paramiko.RSAKey.from_private_key(io.StringIO(server["private_key"]))
+                    except Exception:
+                        connect_kwargs["pkey"] = paramiko.Ed25519Key.from_private_key(io.StringIO(server["private_key"]))
+                elif password:
+                    connect_kwargs["password"] = password
+                ssh.connect(**connect_kwargs)
                 
                 cmd = server.get("custom_command", "").strip()
                 if not cmd:

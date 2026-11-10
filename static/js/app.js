@@ -1030,13 +1030,28 @@ function renderPlansTabsAndPanel() {
                     : `<span class="inline-flex items-center gap-1 text-rose-600 text-[11px] font-bold" title="${s.last_test.message}"><i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> Erro</span>`;
             }
 
+            let guestBadges = '';
+            if (s.selected_guests && s.selected_guests.length > 0) {
+                const qCount = s.selected_guests.filter(g => g.type === 'qemu' || g.type === 'vmware_vm').length;
+                const lCount = s.selected_guests.filter(g => g.type === 'lxc').length;
+                const gSummary = s.selected_guests.map(g => `${g.id}: ${g.name} (${g.type === 'lxc' ? 'CT' : 'VM'})`).join(', ');
+                guestBadges = `
+                    <div class="flex flex-wrap items-center gap-1.5 mt-1" title="${escapeHtml(gSummary)}">
+                        ${qCount > 0 ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-mono text-[10px] font-bold"><i data-lucide="box" class="w-3 h-3"></i> ${qCount} VMs</span>` : ''}
+                        ${lCount > 0 ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 font-mono text-[10px] font-bold"><i data-lucide="layers" class="w-3 h-3"></i> ${lCount} CTs</span>` : ''}
+                        ${s.shutdown_host ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-mono text-[10px] font-bold"><i data-lucide="power" class="w-3 h-3"></i> + Host</span>` : ''}
+                    </div>
+                `;
+            }
+
             return `
                 <tr class="hover:bg-slate-50 transition text-xs">
                     <td class="p-3.5">
-                        <div class="font-bold text-enging-navy">${s.name}</div>
-                        <div class="text-[11px] text-slate-500 font-mono truncate max-w-sm mt-0.5" title="${s.custom_command}">${s.custom_command || 'Padrão'}</div>
+                        <div class="font-bold text-enging-navy">${escapeHtml(s.name)}</div>
+                        ${guestBadges}
+                        <div class="text-[10px] text-slate-400 font-mono truncate max-w-sm mt-0.5" title="${escapeHtml(s.custom_command)}">${escapeHtml(s.custom_command || 'Padrão')}</div>
                     </td>
-                    <td class="p-3.5 font-mono text-slate-600 font-medium">${s.host || s.webhook_url || 'local'}:${s.port || 22}</td>
+                    <td class="p-3.5 font-mono text-slate-600 font-medium">${escapeHtml(s.host || s.webhook_url || 'local')}:${s.port || 22}</td>
                     <td class="p-3.5">${methodBadge}</td>
                     <td class="p-3.5 font-mono text-enging-orange font-black">${s.delay_sec || 0}s</td>
                     <td class="p-3.5">${testBadge}</td>
@@ -1318,14 +1333,37 @@ function deletePlan(planId, planName) {
     });
 }
 
-function openAddServerModal(planId, serverId = null) {
+async function openAddServerModal(planId, serverId = null) {
     const plan = (allPlansData.plans || []).find(x => x.id === planId);
     if (!plan) return;
+
+    // 1. Obter servidores cadastrados atualizados
+    let summaryData = { proxmox: [], vmware: [], nut_local: {} };
+    try {
+        const sumRes = await fetch('/api/connections/servers-summary');
+        if (sumRes.ok) {
+            summaryData = await sumRes.json();
+        }
+    } catch (e) {
+        console.error('Falha ao obter sumário de servidores:', e);
+    }
+
+    const proxmoxServers = (summaryData.proxmox && summaryData.proxmox.length > 0)
+        ? summaryData.proxmox 
+        : ((allConnectionsData && allConnectionsData.proxmox_servers) || []);
+    const vmwareServers = (summaryData.vmware && summaryData.vmware.length > 0)
+        ? summaryData.vmware 
+        : ((allConnectionsData && allConnectionsData.vmware_servers) || []);
+    const nutLocal = summaryData.nut_local || { name: 'Servidor Local NUT (10.255.255.28)', host: '127.0.0.1', type: 'local' };
 
     const isEdit = !!serverId;
     const s = isEdit ? (plan.servers || []).find(x => x.id === serverId) : {
         id: '',
         name: '',
+        connection_id: '',
+        connection_type: '',
+        selected_guests: [],
+        shutdown_host: false,
         host: '',
         port: 22,
         method: 'ssh',
@@ -1341,72 +1379,206 @@ function openAddServerModal(planId, serverId = null) {
 
     if (!s) return;
 
+    // Determina valor inicial da seleção
+    let initialRegValue = 'manual';
+    if (s.connection_id && s.connection_type) {
+        initialRegValue = `${s.connection_type}:${s.connection_id}`;
+    } else if (s.method === 'local_command') {
+        initialRegValue = 'local:nut';
+    } else if (!isEdit) {
+        if (proxmoxServers.length > 0) {
+            initialRegValue = `proxmox:${proxmoxServers[0].id}`;
+        } else if (vmwareServers.length > 0) {
+            initialRegValue = `vmware:${vmwareServers[0].id}`;
+        }
+    }
+
+    // Monta opções do dropdown agrupado
+    let optHtml = '';
+    if (proxmoxServers.length > 0) {
+        optHtml += '<optgroup label="Proxmox VE (Clusters & Nós SSH)">';
+        proxmoxServers.forEach(p => {
+            const val = `proxmox:${p.id}`;
+            optHtml += `<option value="${val}" ${initialRegValue === val ? 'selected' : ''}>🖥️ ${escapeHtml(p.name)} (${escapeHtml(p.host)})</option>`;
+        });
+        optHtml += '</optgroup>';
+    }
+
+    if (vmwareServers.length > 0) {
+        optHtml += '<optgroup label="VMware ESXi (Hosts)">';
+        vmwareServers.forEach(v => {
+            const val = `vmware:${v.id}`;
+            optHtml += `<option value="${val}" ${initialRegValue === val ? 'selected' : ''}>🛡️ ${escapeHtml(v.name)} (${escapeHtml(v.host)})</option>`;
+        });
+        optHtml += '</optgroup>';
+    }
+
+    optHtml += '<optgroup label="Servidor Local da UPS">';
+    optHtml += `<option value="local:nut" ${initialRegValue === 'local:nut' ? 'selected' : ''}>⚡ ${escapeHtml(nutLocal.name)}</option>`;
+    optHtml += '</optgroup>';
+
+    optHtml += '<optgroup label="Configuração Manual">';
+    optHtml += `<option value="manual" ${initialRegValue === 'manual' ? 'selected' : ''}>⚙️ Configuração Manual (Outro Host / Webhook)</option>`;
+    optHtml += '</optgroup>';
+
     swalEnging.fire({
-        title: isEdit ? `Editar Alvo em [${plan.name}]` : `Adicionar Alvo a [${plan.name}]`,
+        title: isEdit ? `Editar Alvo em [${escapeHtml(plan.name)}]` : `Adicionar Alvo a [${escapeHtml(plan.name)}]`,
+        width: '680px',
         html: `
-            <div class="text-left space-y-3.5 mt-2 font-sans">
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Alvo / VM</label>
-                    <input id="swal-srv-name" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" placeholder="Ex: Proxmox VMs Dev (101 a 108), ESXi Node 01, Host Local" value="${s.name}">
-                </div>
+            <div class="text-left space-y-3.5 mt-2 font-sans text-xs">
                 
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Método</label>
-                        <select id="swal-srv-method" onchange="toggleMethodFields()" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange">
-                            <option value="ssh" ${s.method === 'ssh' ? 'selected' : ''}>SSH (Linux / Proxmox / ESXi)</option>
-                            <option value="windows_ssh" ${s.method === 'windows_ssh' ? 'selected' : ''}>SSH (Windows Server)</option>
-                            <option value="local_command" ${s.method === 'local_command' ? 'selected' : ''}>Comando Local no Host NUT</option>
-                            <option value="webhook" ${s.method === 'webhook' ? 'selected' : ''}>Webhook / HTTP API</option>
-                        </select>
+                <!-- 1. SELEÇÃO DE SERVIDOR CADASTRADO -->
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="block font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                            <i data-lucide="server" class="w-4 h-4 text-enging-orange"></i>
+                            <span>1. Selecionar Servidor Cadastrado (Conexões & APIs)</span>
+                        </label>
+                        <span class="text-[10px] text-slate-400 font-mono">Infraestrutura</span>
+                    </div>
+                    <select id="swal-srv-registered" onchange="window.onRegisteredServerChange()" class="w-full px-3.5 py-2.5 text-xs rounded-xl bg-white border border-slate-300 font-bold text-slate-900 focus:outline-none focus:border-enging-orange focus:ring-1 focus:ring-enging-orange">
+                        ${optHtml}
+                    </select>
+                </div>
+
+                <!-- 2. GUESTS (VMs e CTs) - Carregado via SSH para Proxmox/VMware -->
+                <div id="swal-guests-box" class="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-xs">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                        <div>
+                            <span class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <i data-lucide="boxes" class="w-4 h-4 text-enging-navy"></i>
+                                <span>2. Selecionar Máquinas Virtuais (VMs) e Containers (CTs)</span>
+                            </span>
+                            <span class="text-[11px] text-slate-500 block mt-0.5">Marque as instâncias que deverão ser desligadas por este plano</span>
+                        </div>
+                        <span id="swal-guests-count-badge" class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono text-[10px] font-bold">
+                            0 selecionadas
+                        </span>
+                    </div>
+
+                    <!-- Quick Action Buttons & Search Filter -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 pt-1" id="swal-guests-toolbar">
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="window.selectAllGuests('running')" class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-[11px] transition flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Apenas Ativas (Running)
+                            </button>
+                            <button type="button" onclick="window.selectAllGuests('all')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-medium text-[11px] transition">
+                                Todas
+                            </button>
+                            <button type="button" onclick="window.selectAllGuests('none')" class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-200 font-medium text-[11px] transition">
+                                Desmarcar
+                            </button>
+                        </div>
+                        <div class="w-44">
+                            <input type="text" id="swal-guests-search" oninput="window.filterGuestsList()" placeholder="Filtrar por nome/ID..." class="w-full px-2.5 py-1 text-[11px] rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none focus:border-enging-orange">
+                        </div>
+                    </div>
+
+                    <!-- Loading Spinner -->
+                    <div id="swal-guests-loading" class="py-6 flex flex-col items-center justify-center gap-2 text-slate-500">
+                        <i data-lucide="loader-2" class="w-6 h-6 animate-spin text-enging-orange"></i>
+                        <span class="text-xs font-medium">Consultando VMs e CTs no nó via SSH...</span>
+                    </div>
+
+                    <!-- Error Alert -->
+                    <div id="swal-guests-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
+
+                    <!-- Guests Checklist Container -->
+                    <div id="swal-guests-list" class="space-y-1.5 max-h-56 overflow-y-auto pr-1"></div>
+
+                    <!-- Checkbox: Desligar também o Host físico -->
+                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <label for="swal-srv-shutdown-host" class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="swal-srv-shutdown-host" onchange="window.updateAutoCommand()" ${s.shutdown_host ? 'checked' : ''} class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300">
+                            <span class="font-bold text-slate-800 text-xs">Desligar também o Host / Servidor Físico após as VMs/CTs</span>
+                        </label>
+                        <span class="text-[10px] text-slate-400 font-mono">(shutdown -h now)</span>
+                    </div>
+                </div>
+
+                <!-- 3. IDENTIFICAÇÃO DO ALVO & DELAY -->
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Alvo / VM</label>
+                        <input id="swal-srv-name" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-enging-orange" placeholder="Ex: SuperMicro - VMs & CTs" value="${escapeHtml(s.name)}">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Delay Sequencial (s)</label>
-                        <input id="swal-srv-delay" type="number" min="0" max="600" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" value="${s.delay_sec || 0}" placeholder="0">
+                        <input id="swal-srv-delay" type="number" min="0" max="600" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" value="${s.delay_sec || 0}" placeholder="0">
                     </div>
                 </div>
 
-                <div id="ssh-fields" class="space-y-3">
-                    <div class="grid grid-cols-3 gap-3">
-                        <div class="col-span-2">
-                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Endereço IP / Hostname</label>
-                            <input id="swal-srv-host" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="10.255.255.10" value="${s.host}">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Porta</label>
-                            <input id="swal-srv-port" type="number" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" value="${s.port || 22}">
-                        </div>
+                <!-- 4. CAMPOS MANUAIS (SSH / WEBHOOK) - Visíveis apenas em Modo Manual -->
+                <div id="manual-fields" class="space-y-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hidden">
+                    <div class="font-bold text-slate-800 text-xs flex items-center gap-1.5 border-b border-slate-200/60 pb-1.5">
+                        <i data-lucide="terminal" class="w-4 h-4 text-slate-600"></i>
+                        <span>Parâmetros de Conexão Manual</span>
                     </div>
-
+                    
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Utilizador</label>
-                            <input id="swal-srv-user" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="root / admin" value="${s.username}">
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Método</label>
+                            <select id="swal-srv-method" onchange="window.toggleManualMethodFields()" class="w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange">
+                                <option value="ssh" ${s.method === 'ssh' ? 'selected' : ''}>SSH (Linux / Proxmox / ESXi)</option>
+                                <option value="windows_ssh" ${s.method === 'windows_ssh' ? 'selected' : ''}>SSH (Windows Server)</option>
+                                <option value="local_command" ${s.method === 'local_command' ? 'selected' : ''}>Comando Local no Host NUT</option>
+                                <option value="webhook" ${s.method === 'webhook' ? 'selected' : ''}>Webhook / HTTP API</option>
+                            </select>
                         </div>
+                        <div class="flex items-center gap-2 pt-5">
+                            <input type="checkbox" id="swal-srv-sudo" ${s.sudo ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-enging-orange focus:ring-enging-orange">
+                            <label for="swal-srv-sudo" class="text-xs text-slate-700 font-medium cursor-pointer">Executar com sudo</label>
+                        </div>
+                    </div>
+
+                    <div id="manual-ssh-inputs" class="space-y-2.5">
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="col-span-2">
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Endereço IP / Hostname</label>
+                                <input id="swal-srv-host" class="w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="10.255.255.10" value="${escapeHtml(s.host || '')}">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Porta</label>
+                                <input id="swal-srv-port" type="number" class="w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" value="${s.port || 22}">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Utilizador</label>
+                                <input id="swal-srv-user" class="w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="root" value="${escapeHtml(s.username || 'root')}">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Senha</label>
+                                <input id="swal-srv-pass" type="password" class="w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="${isEdit ? '(Manter atual ou alterar)' : 'Senha'}" value="${escapeHtml(s.password || '')}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="manual-webhook-inputs" class="space-y-2.5 hidden">
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Senha</label>
-                            <input id="swal-srv-pass" type="password" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="${isEdit ? '(Manter atual ou alterar)' : 'Senha'}" value="${s.password}">
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">URL do Webhook / API</label>
+                            <input id="swal-srv-webhook-url" class="w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="https://api.empresa.pt/shutdown" value="${escapeHtml(s.webhook_url || '')}">
                         </div>
                     </div>
-
-                    <div class="flex items-center gap-2">
-                        <input type="checkbox" id="swal-srv-sudo" ${s.sudo ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-enging-orange focus:ring-enging-orange">
-                        <label for="swal-srv-sudo" class="text-xs text-slate-700 font-medium cursor-pointer">Executar com sudo</label>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Comando Personalizado de Desligamento</label>
-                        <input id="swal-srv-cmd" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" value="${s.custom_command}">
-                        <p class="text-[10px] text-slate-500 mt-1">Ex: <code class="text-enging-navy font-bold">qm shutdown 101</code> ou <code class="text-enging-navy font-bold">esxcli system shutdown poweroff</code></p>
-                    </div>
                 </div>
 
-                <div id="webhook-fields" class="space-y-3 hidden">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">URL do Webhook / API</label>
-                        <input id="swal-srv-webhook-url" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-enging-orange" placeholder="https://api.proxmox:8006/..." value="${s.webhook_url || ''}">
+                <!-- 5. COMANDO GERADO & OPÇÕES AVANÇADAS -->
+                <details class="group rounded-2xl border border-slate-200 p-3 bg-slate-50/70">
+                    <summary class="font-bold text-slate-700 cursor-pointer flex items-center justify-between text-xs select-none">
+                        <span class="flex items-center gap-1.5">
+                            <i data-lucide="code" class="w-3.5 h-3.5 text-slate-500"></i>
+                            <span>Comando de Desligamento Automático</span>
+                        </span>
+                        <i data-lucide="chevron-down" class="w-4 h-4 transition group-open:rotate-180 text-slate-400"></i>
+                    </summary>
+                    <div class="pt-3 mt-2 border-t border-slate-200/60 space-y-2">
+                        <label class="block text-[11px] font-bold text-slate-700">Comando Executado via SSH / Shell:</label>
+                        <textarea id="swal-srv-cmd" rows="3" class="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-800 font-mono focus:outline-none focus:border-enging-orange leading-relaxed">${escapeHtml(s.custom_command || 'shutdown -h now')}</textarea>
+                        <p class="text-[10px] text-slate-400">O comando é montado automaticamente conforme você marca/desmarca as VMs e CTs acima.</p>
                     </div>
-                </div>
+                </details>
+
             </div>
         `,
         showCancelButton: true,
@@ -1414,63 +1586,413 @@ function openAddServerModal(planId, serverId = null) {
         cancelButtonText: 'Cancelar',
         focusConfirm: false,
         didOpen: () => {
-            window.toggleMethodFields = () => {
-                const method = document.getElementById('swal-srv-method').value;
-                const sshBox = document.getElementById('ssh-fields');
-                const hookBox = document.getElementById('webhook-fields');
-                const cmdInput = document.getElementById('swal-srv-cmd');
+            lucide.createIcons();
+
+            let currentGuests = [];
+            const previouslySelectedMap = new Map();
+            if (isEdit && s.selected_guests && s.selected_guests.length > 0) {
+                s.selected_guests.forEach(g => {
+                    previouslySelectedMap.set(`${g.type || 'qemu'}:${g.id}`, true);
+                });
+            }
+
+            window.toggleManualMethodFields = () => {
+                const method = document.getElementById('swal-srv-method')?.value || 'ssh';
+                const sshBox = document.getElementById('manual-ssh-inputs');
+                const hookBox = document.getElementById('manual-webhook-inputs');
                 if (method === 'webhook') {
-                    sshBox.classList.add('hidden');
-                    hookBox.classList.remove('hidden');
-                } else if (method === 'local_command') {
-                    sshBox.classList.remove('hidden');
-                    hookBox.classList.add('hidden');
-                    document.getElementById('swal-srv-host').value = '127.0.0.1';
+                    if (sshBox) sshBox.classList.add('hidden');
+                    if (hookBox) hookBox.classList.remove('hidden');
                 } else {
-                    sshBox.classList.remove('hidden');
-                    hookBox.classList.add('hidden');
-                    if (method === 'windows_ssh' && cmdInput.value === 'shutdown -h now') {
-                        cmdInput.value = 'shutdown /s /t 0 /f';
+                    if (sshBox) sshBox.classList.remove('hidden');
+                    if (hookBox) hookBox.classList.add('hidden');
+                    if (method === 'local_command') {
+                        const h = document.getElementById('swal-srv-host');
+                        if (h) h.value = '127.0.0.1';
                     }
                 }
             };
-            window.toggleMethodFields();
+
+            window.filterGuestsList = () => {
+                const query = (document.getElementById('swal-guests-search')?.value || '').toLowerCase().trim();
+                const rows = document.querySelectorAll('.guest-item-row');
+                rows.forEach(r => {
+                    const name = (r.dataset.name || '').toLowerCase();
+                    const id = (r.dataset.id || '').toLowerCase();
+                    if (!query || name.includes(query) || id.includes(query)) {
+                        r.classList.remove('hidden');
+                    } else {
+                        r.classList.add('hidden');
+                    }
+                });
+            };
+
+            window.updateAutoCommand = () => {
+                const regVal = document.getElementById('swal-srv-registered')?.value || 'manual';
+                const shutdownHost = document.getElementById('swal-srv-shutdown-host')?.checked || false;
+                const cmdTextarea = document.getElementById('swal-srv-cmd');
+                const badge = document.getElementById('swal-guests-count-badge');
+
+                if (regVal === 'manual' || regVal === 'local:nut') {
+                    return;
+                }
+
+                const checkedBoxes = Array.from(document.querySelectorAll('.guest-chk:checked'));
+                const checkedGuests = checkedBoxes.map(cb => ({
+                    id: cb.dataset.id,
+                    name: cb.dataset.name,
+                    type: cb.dataset.type,
+                    status: cb.dataset.status
+                }));
+
+                if (badge) {
+                    badge.innerText = `${checkedGuests.length} selecionadas`;
+                    badge.className = checkedGuests.length > 0 
+                        ? 'px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold'
+                        : 'px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-mono text-[10px] font-bold';
+                }
+
+                let cmds = [];
+                if (regVal.startsWith('proxmox:')) {
+                    const qemuIds = checkedGuests.filter(g => g.type === 'qemu').map(g => g.id);
+                    const lxcIds = checkedGuests.filter(g => g.type === 'lxc').map(g => g.id);
+
+                    if (qemuIds.length > 0) {
+                        cmds.push(`for vmid in ${qemuIds.join(' ')}; do qm shutdown $vmid & done;`);
+                    }
+                    if (lxcIds.length > 0) {
+                        cmds.push(`for ctid in ${lxcIds.join(' ')}; do pct shutdown $ctid & done;`);
+                    }
+                    if (qemuIds.length > 0 || lxcIds.length > 0) {
+                        cmds.push('wait;');
+                    }
+                    if (shutdownHost) {
+                        cmds.push('shutdown -h now');
+                    }
+                } else if (regVal.startsWith('vmware:')) {
+                    const vmIds = checkedGuests.map(g => g.id);
+                    if (vmIds.length > 0) {
+                        cmds.push(`for vmid in ${vmIds.join(' ')}; do vim-cmd vmsvc/power.shutdown $vmid & done; wait;`);
+                    }
+                    if (shutdownHost) {
+                        cmds.push('esxcli system shutdown poweroff -d 10 -r "UPS Low Battery"');
+                    }
+                }
+
+                let finalCmd = cmds.join(' ').trim();
+                if (!finalCmd && shutdownHost) {
+                    finalCmd = 'shutdown -h now';
+                } else if (!finalCmd) {
+                    finalCmd = 'echo "Nenhuma VM selecionada"';
+                }
+
+                if (cmdTextarea) {
+                    cmdTextarea.value = finalCmd;
+                }
+            };
+
+            window.selectAllGuests = (mode) => {
+                const boxes = document.querySelectorAll('.guest-chk');
+                boxes.forEach(cb => {
+                    if (mode === 'running') {
+                        cb.checked = (cb.dataset.status === 'running');
+                    } else if (mode === 'all') {
+                        cb.checked = true;
+                    } else if (mode === 'none') {
+                        cb.checked = false;
+                    }
+                });
+                window.updateAutoCommand();
+            };
+
+            window.onRegisteredServerChange = async () => {
+                const regVal = document.getElementById('swal-srv-registered')?.value || 'manual';
+                const guestsBox = document.getElementById('swal-guests-box');
+                const manualFields = document.getElementById('manual-fields');
+                const loadingEl = document.getElementById('swal-guests-loading');
+                const errorEl = document.getElementById('swal-guests-error');
+                const listEl = document.getElementById('swal-guests-list');
+                const nameInput = document.getElementById('swal-srv-name');
+                const cmdTextarea = document.getElementById('swal-srv-cmd');
+
+                if (errorEl) errorEl.classList.add('hidden');
+
+                if (regVal === 'manual') {
+                    if (guestsBox) guestsBox.classList.add('hidden');
+                    if (manualFields) manualFields.classList.remove('hidden');
+                    window.toggleManualMethodFields();
+                    return;
+                }
+
+                if (manualFields) manualFields.classList.add('hidden');
+
+                if (regVal === 'local:nut') {
+                    if (guestsBox) guestsBox.classList.add('hidden');
+                    if (nameInput && (!nameInput.value || nameInput.value.includes('Proxmox') || nameInput.value.includes('VMware'))) {
+                        nameInput.value = nutLocal.name;
+                    }
+                    if (cmdTextarea) cmdTextarea.value = 'shutdown -h now';
+                    return;
+                }
+
+                // Servidor Proxmox ou VMware
+                if (guestsBox) guestsBox.classList.remove('hidden');
+                if (loadingEl) loadingEl.classList.remove('hidden');
+                if (listEl) listEl.innerHTML = '';
+
+                const [connType, connId] = regVal.split(':');
+                const isProxmox = (connType === 'proxmox');
+                const endpoint = isProxmox 
+                    ? `/api/connections/proxmox/${connId}/guests` 
+                    : `/api/connections/vmware/${connId}/guests`;
+
+                try {
+                    const res = await fetch(endpoint);
+                    const data = await res.json();
+                    if (loadingEl) loadingEl.classList.add('hidden');
+
+                    if (!data.success) {
+                        if (errorEl) {
+                            errorEl.innerText = data.message || 'Falha ao consultar servidor';
+                            errorEl.classList.remove('hidden');
+                        }
+                        return;
+                    }
+
+                    const vms = data.vms || [];
+                    const cts = data.cts || [];
+                    currentGuests = [...vms, ...cts];
+
+                    if (nameInput && (!nameInput.value || nameInput.value.includes('Proxmox') || nameInput.value.includes('VMware') || !isEdit)) {
+                        nameInput.value = `${data.server?.name || 'Servidor'} - VMs e CTs`;
+                    }
+
+                    if (currentGuests.length === 0) {
+                        if (listEl) {
+                            listEl.innerHTML = `
+                                <div class="p-4 text-center text-slate-400 italic bg-slate-50 rounded-xl border border-slate-200">
+                                    Nenhuma VM ou Container encontrado neste servidor.
+                                </div>
+                            `;
+                        }
+                        window.updateAutoCommand();
+                        return;
+                    }
+
+                    // Renderiza lista
+                    let itemsHtml = '';
+
+                    // 1. VMs QEMU / VMware
+                    if (vms.length > 0) {
+                        itemsHtml += `
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 pt-1 flex items-center gap-1">
+                                <i data-lucide="box" class="w-3 h-3 text-blue-500"></i>
+                                <span>Máquinas Virtuais (${vms.length})</span>
+                            </div>
+                        `;
+                        vms.forEach(g => {
+                            const isRunning = (g.status === 'running');
+                            let isChecked = false;
+                            const key = `${g.type || 'qemu'}:${g.id}`;
+                            if (isEdit && previouslySelectedMap.has(key)) {
+                                isChecked = true;
+                            } else if (!isEdit) {
+                                isChecked = isRunning; // por defeito marca apenas ativas
+                            }
+
+                            itemsHtml += `
+                                <label class="guest-item-row flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition" data-id="${g.id}" data-name="${escapeHtml(g.name)}">
+                                    <div class="flex items-center gap-2.5">
+                                        <input type="checkbox" class="guest-chk w-4 h-4 rounded text-enging-orange focus:ring-enging-orange border-slate-300" 
+                                               data-id="${g.id}" data-name="${escapeHtml(g.name)}" data-type="${g.type || 'qemu'}" data-status="${g.status}"
+                                               onchange="window.updateAutoCommand()" ${isChecked ? 'checked' : ''}>
+                                        <div>
+                                            <div class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                                <span class="font-mono text-slate-400 font-semibold">[VM ${g.id}]</span>
+                                                <span>${escapeHtml(g.name)}</span>
+                                            </div>
+                                            <div class="text-[10px] text-slate-400 font-mono">
+                                                ${g.mem ? `Mem: ${g.mem}MB` : ''} ${g.disk ? `• Disco: ${g.disk}GB` : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                            ${g.type === 'vmware_vm' ? 'ESXi' : 'QEMU'}
+                                        </span>
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold ${isRunning ? 'text-emerald-700' : 'text-slate-400'}">
+                                            <span class="w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}"></span>
+                                            ${isRunning ? 'Ativa' : 'Parada'}
+                                        </span>
+                                    </div>
+                                </label>
+                            `;
+                        });
+                    }
+
+                    // 2. Containers LXC (Proxmox)
+                    if (cts.length > 0) {
+                        itemsHtml += `
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 pt-2 flex items-center gap-1">
+                                <i data-lucide="layers" class="w-3 h-3 text-purple-500"></i>
+                                <span>Containers LXC (${cts.length})</span>
+                            </div>
+                        `;
+                        cts.forEach(g => {
+                            const isRunning = (g.status === 'running');
+                            let isChecked = false;
+                            const key = `lxc:${g.id}`;
+                            if (isEdit && previouslySelectedMap.has(key)) {
+                                isChecked = true;
+                            } else if (!isEdit) {
+                                isChecked = isRunning;
+                            }
+
+                            itemsHtml += `
+                                <label class="guest-item-row flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition" data-id="${g.id}" data-name="${escapeHtml(g.name)}">
+                                    <div class="flex items-center gap-2.5">
+                                        <input type="checkbox" class="guest-chk w-4 h-4 rounded text-enging-orange focus:ring-enging-orange border-slate-300" 
+                                               data-id="${g.id}" data-name="${escapeHtml(g.name)}" data-type="lxc" data-status="${g.status}"
+                                               onchange="window.updateAutoCommand()" ${isChecked ? 'checked' : ''}>
+                                        <div>
+                                            <div class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                                <span class="font-mono text-purple-400 font-semibold">[CT ${g.id}]</span>
+                                                <span>${escapeHtml(g.name)}</span>
+                                            </div>
+                                            <div class="text-[10px] text-slate-400 font-mono">
+                                                LXC Container ${g.lock ? `• Lock: ${escapeHtml(g.lock)}` : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                            LXC
+                                        </span>
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold ${isRunning ? 'text-emerald-700' : 'text-slate-400'}">
+                                            <span class="w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}"></span>
+                                            ${isRunning ? 'Ativo' : 'Parado'}
+                                        </span>
+                                    </div>
+                                </label>
+                            `;
+                        });
+                    }
+
+                    if (listEl) {
+                        listEl.innerHTML = itemsHtml;
+                        lucide.createIcons();
+                    }
+
+                    window.updateAutoCommand();
+
+                } catch (err) {
+                    if (loadingEl) loadingEl.classList.add('hidden');
+                    if (errorEl) {
+                        errorEl.innerText = 'Erro ao contactar API de conexões: ' + err;
+                        errorEl.classList.remove('hidden');
+                    }
+                }
+            };
+
+            // Dispara inicialização
+            window.onRegisteredServerChange();
         },
         preConfirm: () => {
-            const name = document.getElementById('swal-srv-name').value.trim();
-            const method = document.getElementById('swal-srv-method').value;
-            const delay_sec = parseInt(document.getElementById('swal-srv-delay').value) || 0;
+            const regVal = document.getElementById('swal-srv-registered')?.value || 'manual';
+            const nameInput = document.getElementById('swal-srv-name')?.value.trim() || '';
+            const delay_sec = parseInt(document.getElementById('swal-srv-delay')?.value) || 0;
+            const shutdownHost = document.getElementById('swal-srv-shutdown-host')?.checked || false;
 
-            if (!name) {
-                Swal.showValidationMessage('Por favor informe o nome do alvo.');
-                return false;
-            }
-
-            const serverPayload = {
+            let payload = {
                 id: s.id || undefined,
-                name: name,
-                method: method,
+                name: nameInput,
                 delay_sec: delay_sec,
                 enabled: true
             };
 
-            if (method === 'webhook') {
-                serverPayload.webhook_url = document.getElementById('swal-srv-webhook-url').value.trim();
-                serverPayload.webhook_method = 'POST';
-                if (!serverPayload.webhook_url) {
-                    Swal.showValidationMessage('Informe a URL do Webhook.');
+            if (regVal === 'manual') {
+                const method = document.getElementById('swal-srv-method')?.value || 'ssh';
+                payload.method = method;
+                payload.connection_type = 'manual';
+                if (!nameInput) {
+                    Swal.showValidationMessage('Informe o nome do alvo.');
                     return false;
                 }
-            } else {
-                serverPayload.host = document.getElementById('swal-srv-host').value.trim();
-                serverPayload.port = parseInt(document.getElementById('swal-srv-port').value) || 22;
-                serverPayload.username = document.getElementById('swal-srv-user').value.trim();
-                serverPayload.password = document.getElementById('swal-srv-pass').value;
-                serverPayload.sudo = document.getElementById('swal-srv-sudo').checked;
-                serverPayload.custom_command = document.getElementById('swal-srv-cmd').value.trim();
+                if (method === 'webhook') {
+                    payload.webhook_url = document.getElementById('swal-srv-webhook-url')?.value.trim() || '';
+                    payload.webhook_method = 'POST';
+                    if (!payload.webhook_url) {
+                        Swal.showValidationMessage('Informe a URL do Webhook.');
+                        return false;
+                    }
+                } else {
+                    payload.host = document.getElementById('swal-srv-host')?.value.trim() || '';
+                    payload.port = parseInt(document.getElementById('swal-srv-port')?.value) || 22;
+                    payload.username = document.getElementById('swal-srv-user')?.value.trim() || 'root';
+                    payload.password = document.getElementById('swal-srv-pass')?.value || '';
+                    payload.sudo = document.getElementById('swal-srv-sudo')?.checked || false;
+                    payload.custom_command = document.getElementById('swal-srv-cmd')?.value.trim() || 'shutdown -h now';
+                    if (!payload.host) {
+                        Swal.showValidationMessage('Informe o host/IP do servidor.');
+                        return false;
+                    }
+                }
+                return payload;
             }
 
-            return serverPayload;
+            if (regVal === 'local:nut') {
+                payload.name = nameInput || nutLocal.name;
+                payload.method = 'local_command';
+                payload.connection_type = 'local';
+                payload.host = '127.0.0.1';
+                payload.port = 22;
+                payload.sudo = true;
+                payload.custom_command = document.getElementById('swal-srv-cmd')?.value.trim() || 'shutdown -h now';
+                return payload;
+            }
+
+            // Proxmox ou VMware
+            const [connType, connId] = regVal.split(':');
+            const checkedBoxes = Array.from(document.querySelectorAll('.guest-chk:checked'));
+            const selectedGuests = checkedBoxes.map(cb => ({
+                id: cb.dataset.id,
+                name: cb.dataset.name,
+                type: cb.dataset.type,
+                status: cb.dataset.status
+            }));
+
+            if (selectedGuests.length === 0 && !shutdownHost) {
+                Swal.showValidationMessage('Por favor selecione pelo menos uma VM/CT para desligar ou marque para desligar o Host.');
+                return false;
+            }
+
+            let defaultTargetName = '';
+            let targetHost = '';
+            let targetPort = 22;
+
+            if (connType === 'proxmox') {
+                const srv = proxmoxServers.find(p => p.id === connId) || {};
+                defaultTargetName = `${srv.name || 'Proxmox'} - ${selectedGuests.length} Guests`;
+                targetHost = srv.host || '';
+                targetPort = srv.port || 22;
+            } else if (connType === 'vmware') {
+                const srv = vmwareServers.find(v => v.id === connId) || {};
+                defaultTargetName = `${srv.name || 'VMware'} - ${selectedGuests.length} VMs`;
+                targetHost = srv.host || '';
+                targetPort = srv.port || 22;
+            }
+
+            payload.name = nameInput || defaultTargetName;
+            payload.connection_type = connType;
+            payload.connection_id = connId;
+            payload.method = 'ssh';
+            payload.host = targetHost;
+            payload.port = targetPort;
+            payload.selected_guests = selectedGuests;
+            payload.shutdown_host = shutdownHost;
+            payload.custom_command = document.getElementById('swal-srv-cmd')?.value.trim() || 'shutdown -h now';
+
+            return payload;
         }
     }).then(async (result) => {
         if (result.isConfirmed) {
@@ -1489,6 +2011,8 @@ function openAddServerModal(planId, serverId = null) {
                         showConfirmButton: false
                     });
                     loadPlansData();
+                } else {
+                    swalEnging.fire('Erro', data.message || 'Falha ao salvar alvo', 'error');
                 }
             } catch (e) {
                 swalEnging.fire('Erro', 'Falha ao salvar alvo: ' + e, 'error');

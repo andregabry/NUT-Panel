@@ -522,3 +522,285 @@ class ConnectionsManager:
                     self._save_data_no_lock()
                     return dict(t)
         return None
+
+
+    # --- SERVERS & GUESTS (VMs / CTs) FOR SHUTDOWN AUTOMATION ---
+
+    def get_registered_servers(self) -> Dict[str, Any]:
+        """Retorna lista resumida de todos os servidores registrados (Proxmox, VMware e NUT)."""
+        with self.lock:
+            proxmox = []
+            for p in self.data.get("proxmox_servers", []):
+                proxmox.append({
+                    "id": p.get("id"),
+                    "name": p.get("name", "Proxmox"),
+                    "host": p.get("host"),
+                    "port": p.get("port", 22),
+                    "node_name": p.get("node_name", "pve"),
+                    "type": "proxmox",
+                    "status": p.get("status", "unknown"),
+                    "enabled": p.get("enabled", True)
+                })
+
+            vmware = []
+            for v in self.data.get("vmware_servers", []):
+                vmware.append({
+                    "id": v.get("id"),
+                    "name": v.get("name", "VMware ESXi"),
+                    "host": v.get("host"),
+                    "port": v.get("port", 443),
+                    "type": "vmware",
+                    "status": v.get("status", "unknown"),
+                    "enabled": v.get("enabled", True)
+                })
+
+            nut = {
+                "name": "Servidor Local NUT (10.255.255.28)",
+                "host": "127.0.0.1",
+                "port": 22,
+                "type": "local",
+                "status": "online"
+            }
+
+            return {
+                "proxmox": proxmox,
+                "vmware": vmware,
+                "nut_local": nut
+            }
+
+    def get_server_credentials(self, server_type: str, server_id: str) -> Optional[Dict[str, Any]]:
+        """Retorna credenciais completas nao-mascaradas para conexoes SSH/shutdown."""
+        with self.lock:
+            if server_type == "proxmox":
+                for s in self.data.get("proxmox_servers", []):
+                    if s.get("id") == server_id:
+                        return {
+                            "host": s.get("host"),
+                            "port": int(s.get("port", 22)),
+                            "username": s.get("username", "root"),
+                            "password": s.get("password", ""),
+                            "private_key": s.get("private_key", ""),
+                            "sudo": s.get("sudo", False),
+                            "auth_type": s.get("auth_type", "password")
+                        }
+            elif server_type == "vmware":
+                for s in self.data.get("vmware_servers", []):
+                    if s.get("id") == server_id:
+                        return {
+                            "host": s.get("host"),
+                            "port": 22,
+                            "username": s.get("username", "root"),
+                            "password": s.get("password", ""),
+                            "sudo": False,
+                            "auth_type": "password"
+                        }
+            elif server_type == "local":
+                return {
+                    "host": "127.0.0.1",
+                    "port": 22,
+                    "username": "root",
+                    "password": "",
+                    "sudo": True,
+                    "auth_type": "password"
+                }
+        return None
+
+    def get_proxmox_guests(self, server_id: str) -> Dict[str, Any]:
+        """Consulta via SSH ao Proxmox as VMs (QEMU) e CTs (LXC) ativas e configuradas."""
+        server = None
+        with self.lock:
+            for s in self.data.get("proxmox_servers", []):
+                if s.get("id") == server_id:
+                    server = dict(s)
+                    break
+
+        if not server:
+            return {"success": False, "message": "Servidor Proxmox nao encontrado"}
+
+        host = server.get("host")
+        port = int(server.get("port", 22))
+        username = server.get("username", "root")
+        password = server.get("password", "")
+        auth_type = server.get("auth_type", "password")
+        private_key_str = server.get("private_key", "")
+
+        if not paramiko:
+            return {"success": False, "message": "Modulo SSH (paramiko) indisponivel"}
+
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        try:
+            connect_kwargs = {
+                "hostname": host,
+                "port": port,
+                "username": username,
+                "timeout": 7
+            }
+            if auth_type == "key" and private_key_str:
+                import io
+                key_file = io.StringIO(private_key_str)
+                try:
+                    pkey = paramiko.RSAKey.from_private_key(key_file)
+                except Exception:
+                    key_file.seek(0)
+                    pkey = paramiko.Ed25519Key.from_private_key(key_file)
+                connect_kwargs["pkey"] = pkey
+            elif password:
+                connect_kwargs["password"] = password
+
+            ssh.connect(**connect_kwargs)
+
+            # Obter VMs QEMU e Containers LXC em comando unico (maxima velocidade e sem multiplexing timeout)
+            _, o_all, _ = ssh.exec_command("qm list 2>/dev/null; echo '===PCT_SEPARATOR==='; pct list 2>/dev/null")
+            all_output = o_all.read().decode('utf-8', errors='ignore')
+            ssh.close()
+
+            parts_out = all_output.split('===PCT_SEPARATOR===')
+            qm_output = parts_out[0] if len(parts_out) > 0 else ''
+            pct_output = parts_out[1] if len(parts_out) > 1 else ''
+
+            # Parse QEMU VMs
+            vms = []
+            for line in qm_output.strip().splitlines():
+                line = line.strip()
+                if not line or line.upper().startswith("VMID"):
+                    continue
+                parts = line.split()
+                if len(parts) >= 3:
+                    vmid = parts[0]
+                    name = parts[1]
+                    status = parts[2].lower()
+                    mem = parts[3] if len(parts) > 3 else ""
+                    disk = parts[4] if len(parts) > 4 else ""
+                    vms.append({
+                        "id": vmid,
+                        "name": name,
+                        "status": status,
+                        "type": "qemu",
+                        "mem": mem,
+                        "disk": disk
+                    })
+
+            # Parse LXC CTs
+            cts = []
+            for line in pct_output.strip().splitlines():
+                line = line.strip()
+                if not line or line.upper().startswith("VMID"):
+                    continue
+                parts = line.split()
+                if len(parts) >= 3:
+                    vmid = parts[0]
+                    status = parts[1].lower()
+                    name = parts[-1]
+                    lock = parts[2] if len(parts) > 3 else ""
+                    cts.append({
+                        "id": vmid,
+                        "name": name,
+                        "status": status,
+                        "lock": lock,
+                        "type": "lxc"
+                    })
+
+            return {
+                "success": True,
+                "server": {
+                    "id": server_id,
+                    "name": server.get("name"),
+                    "host": host,
+                    "type": "proxmox"
+                },
+                "vms": vms,
+                "cts": cts,
+                "total_vms": len(vms),
+                "total_cts": len(cts),
+                "running_vms": sum(1 for v in vms if v["status"] == "running"),
+                "running_cts": sum(1 for c in cts if c["status"] == "running")
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "server": {"id": server_id, "name": server.get("name"), "host": host},
+                "error": str(e),
+                "message": f"Erro ao comunicar com {server.get('name')} ({host}): {str(e)}"
+            }
+
+    def get_vmware_guests(self, server_id: str) -> Dict[str, Any]:
+        """Consulta via SSH ao VMware ESXi as VMs registradas e seus estados de execucao."""
+        server = None
+        with self.lock:
+            for s in self.data.get("vmware_servers", []):
+                if s.get("id") == server_id:
+                    server = dict(s)
+                    break
+
+        if not server:
+            return {"success": False, "message": "Servidor VMware nao encontrado"}
+
+        host = server.get("host")
+        username = server.get("username", "root")
+        password = server.get("password", "")
+
+        if not paramiko:
+            return {"success": False, "message": "Modulo SSH (paramiko) indisponivel"}
+
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        try:
+            ssh.connect(host, port=22, username=username, password=password, timeout=7)
+            _, o_all, _ = ssh.exec_command("vim-cmd vmsvc/getallvms 2>/dev/null; echo '===PROC_SEPARATOR==='; esxcli vm process list 2>/dev/null")
+            all_output = o_all.read().decode('utf-8', errors='ignore')
+            ssh.close()
+
+            parts_out = all_output.split('===PROC_SEPARATOR===')
+            vms_output = parts_out[0] if len(parts_out) > 0 else ''
+            proc_output = parts_out[1] if len(parts_out) > 1 else ''
+
+            running_names = set()
+            for line in proc_output.splitlines():
+                if "Display Name:" in line:
+                    dname = line.split("Display Name:", 1)[1].strip()
+                    running_names.add(dname)
+
+            vms = []
+            for line in vms_output.strip().splitlines():
+                line = line.strip()
+                if not line or line.upper().startswith("VMID"):
+                    continue
+                parts = line.split()
+                if len(parts) >= 2:
+                    vmid = parts[0]
+                    name = parts[1]
+                    status = "running" if name in running_names else "stopped"
+                    vms.append({
+                        "id": vmid,
+                        "name": name,
+                        "status": status,
+                        "type": "vmware_vm"
+                    })
+
+            return {
+                "success": True,
+                "server": {
+                    "id": server_id,
+                    "name": server.get("name"),
+                    "host": host,
+                    "type": "vmware"
+                },
+                "vms": vms,
+                "cts": [],
+                "total_vms": len(vms),
+                "total_cts": 0,
+                "running_vms": sum(1 for v in vms if v["status"] == "running"),
+                "running_cts": 0
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "server": {"id": server_id, "name": server.get("name"), "host": host},
+                "error": str(e),
+                "message": f"Erro ao comunicar com VMware {server.get('name')} ({host}): {str(e)}"
+            }
