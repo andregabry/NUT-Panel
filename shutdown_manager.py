@@ -21,6 +21,9 @@ class ShutdownManager:
         self.plans_file = plans_file
         self.lock = threading.Lock()
         self.active_threads: Dict[str, threading.Thread] = {}
+        self.connections_manager = None
+        self.alert_manager = None
+        self.latest_nut_data = {}
         self._load_data()
 
     def _get_default_data(self) -> Dict[str, Any]:
@@ -521,6 +524,13 @@ class ShutdownManager:
                 plan["state"]["status"] = "cancelled"
                 self.add_log_unlocked("info", f"Execução do plano '{plan.get('name')}' foi cancelada manualmente.", server_name=plan.get("name"))
                 self._save_data_unlocked()
+                if self.alert_manager:
+                    try:
+                        self.alert_manager.send_shutdown_plan_notification(
+                            plan, "cancelled", nut_data=self.latest_nut_data
+                        )
+                    except Exception as e:
+                        logger.error(f"Erro ao disparar alerta de cancelamento: {e}")
 
     def run_plan_async(self, plan_id: str, dry_run: bool = False) -> None:
         """Executa um plano específico de forma assíncrona respeitando carência e delays."""
@@ -539,6 +549,14 @@ class ShutdownManager:
             servers = [s for s in plan.get("servers", []) if s.get("enabled", True)]
 
         self.add_log("warning", f"Iniciando contagem de segurança ({grace}s) para o plano '{plan_name}'...", server_name=plan_name)
+
+        if self.alert_manager:
+            try:
+                self.alert_manager.send_shutdown_plan_notification(
+                    plan, "triggered", dry_run=dry_run, nut_data=self.latest_nut_data
+                )
+            except Exception as e:
+                logger.error(f"Erro ao disparar alerta de início de plano: {e}")
 
         def worker():
             # Countdown
@@ -581,12 +599,21 @@ class ShutdownManager:
 
             self.add_log("info", f"Plano '{plan_name}' concluído com sucesso.", server_name=plan_name)
 
+            if self.alert_manager:
+                try:
+                    self.alert_manager.send_shutdown_plan_notification(
+                        plan, "completed", results=plan["state"]["results"], dry_run=dry_run, nut_data=self.latest_nut_data
+                    )
+                except Exception as e:
+                    logger.error(f"Erro ao disparar alerta de conclusão de plano: {e}")
+
         t = threading.Thread(target=worker, daemon=True)
         self.active_threads[plan_id] = t
         t.start()
 
     def check_nut_triggers(self, nut_data: Dict[str, Any]) -> None:
         """Verifica os gatilhos de bateria individualmente para cada plano configurado."""
+        self.latest_nut_data = nut_data
         status = nut_data.get("status", {})
         battery = nut_data.get("battery", {})
 

@@ -434,6 +434,236 @@ class AlertManager:
                 sent_webhooks.add(global_wh_url)
                 self.send_webhook_notification(None, global_wh_url, rule, condition_desc, nut_data)
 
+    def send_shutdown_plan_notification(self, plan_data, event_type, results=None, dry_run=False, nut_data=None):
+        """Dispara notificações para contatos selecionados quando um plano de desligamento é iniciado, concluído ou cancelado."""
+        notifications = plan_data.get("notifications", {})
+        if not notifications.get("enabled", True):
+            return {"success": False, "message": "Notificações desativadas para este plano."}
+
+        if event_type == "triggered" and not notifications.get("notify_on_trigger", True):
+            return {"success": False, "message": "Notificação de início desativada."}
+        if event_type == "completed" and not notifications.get("notify_on_completion", True):
+            return {"success": False, "message": "Notificação de conclusão desativada."}
+
+        recipient_ids = notifications.get("recipient_ids", [])
+        channels = notifications.get("channels", ["whatsapp", "email"])
+
+        with self.lock:
+            all_recs = self.data.get("recipients", [])
+            settings = self.data.get("channel_settings", {})
+            if recipient_ids:
+                recipients = [r for r in all_recs if r.get("id") in recipient_ids and r.get("enabled", True)]
+            else:
+                recipients = [r for r in all_recs if r.get("enabled", True)]
+
+        plan_name = plan_data.get("name", "Plano de Desligamento")
+        now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        batt_pct = 0
+        batt_mode = "NORMAL"
+        if nut_data:
+            batt_pct = nut_data.get("battery", {}).get("charge_pct", 0)
+            batt_mode = nut_data.get("status", {}).get("label", "NORMAL")
+
+        servers = plan_data.get("servers", [])
+        mode_str = "🟡 Simulação (Dry-Run)" if dry_run else "🚨 Execução Real"
+
+        if event_type == "triggered":
+            subject = f"[{'SIMULAÇÃO' if dry_run else 'ALERTA'}] Início de Plano de Desligamento: {plan_name}"
+            grace = plan_data.get("grace_period_sec", 10)
+            trigger_pct = plan_data.get("trigger_battery_pct", 30)
+
+            body_lines = [
+                f"🚨 *ENGING UPS - INÍCIO DE DESLIGAMENTO* 🚨",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"📌 *Plano:* {plan_name}",
+                f"⚙️ *Modo:* {mode_str}",
+                f"🕒 *Hora:* {now_str}",
+                f"🔋 *Bateria:* {batt_pct:.0f}% (Gatilho: ≤ {trigger_pct}%)",
+                f"⏱️ *Carência de Segurança:* {grace} segundos",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"⚠️ *Aviso:* A contagem regressiva de segurança foi iniciada.",
+                f"Se a energia da rede não for restabelecida antes do fim da carência, os alvos configurados serão desligados.",
+                f"",
+                f"📋 *Alvos Programados ({len(servers)}):*"
+            ]
+            for s in servers:
+                s_name = s.get("name", "Servidor")
+                s_guests = s.get("selected_guests", [])
+                g_str = f"{len(s_guests)} VMs/CTs" if s_guests else "Comando direto"
+                host_str = " (+ Desliga Host)" if s.get("shutdown_host") else ""
+                body_lines.append(f"  • *{s_name}*: {g_str}{host_str}")
+
+            body_lines.append(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            body_lines.append("Painel: https://10.255.255.28/")
+            body_text = "\n".join(body_lines)
+
+        elif event_type == "cancelled":
+            subject = f"[{'SIMULAÇÃO' if dry_run else 'INFO'}] Plano de Desligamento Cancelado: {plan_name}"
+            body_lines = [
+                f"ℹ️ *ENGING UPS - DESLIGAMENTO CANCELADO* ℹ️",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"📌 *Plano:* {plan_name}",
+                f"⚙️ *Modo:* {mode_str}",
+                f"🕒 *Hora:* {now_str}",
+                f"🔋 *Bateria:* {batt_pct:.0f}% ({batt_mode})",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"✅ A execução do plano de desligamento foi cancelada (interrupção manual ou retorno da rede elétrica).",
+                f"Nenhum servidor ou máquina virtual foi desligado.",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"Painel: https://10.255.255.28/"
+            ]
+            body_text = "\n".join(body_lines)
+
+        else: # completed
+            subject = f"[{'SIMULAÇÃO' if dry_run else 'RELATÓRIO'}] Plano de Desligamento Concluído: {plan_name}"
+
+            total_vms = 0
+            total_cts = 0
+            total_hosts = 0
+            for s in servers:
+                for g in s.get("selected_guests", []):
+                    if g.get("type") == "lxc":
+                        total_cts += 1
+                    else:
+                        total_vms += 1
+                if s.get("shutdown_host"):
+                    total_hosts += 1
+
+            results_map = {}
+            if results:
+                for r in results:
+                    results_map[r.get("server")] = r
+
+            body_lines = [
+                f"🚨 *ENGING UPS - PLANO DE DESLIGAMENTO CONCLUÍDO* 🚨",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"📌 *Plano Executado:* {plan_name}",
+                f"⚙️ *Modo:* {mode_str}",
+                f"🕒 *Hora de Conclusão:* {now_str}",
+                f"🔋 *Nível de Bateria:* {batt_pct:.0f}% ({batt_mode})",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"📋 *STATUS DETALHADO POR ALVO:*",
+                f""
+            ]
+
+            for s in servers:
+                s_name = s.get("name", "Servidor")
+                s_host = s.get("host", "")
+                guests = s.get("selected_guests", [])
+                res = results_map.get(s_name, {})
+                status_icon = "✅" if res.get("success", True) else "❌"
+
+                body_lines.append(f"🖥️ *{s_name}* ({s_host}) {status_icon}")
+
+                vms = [g for g in guests if g.get("type") != "lxc"]
+                cts = [g for g in guests if g.get("type") == "lxc"]
+
+                if vms:
+                    vm_names = [f"{g.get('name')} (ID: {g.get('id')})" for g in vms]
+                    body_lines.append(f"  └─ 📦 *VMs ({len(vms)}):* {', '.join(vm_names)}")
+                if cts:
+                    ct_names = [f"{g.get('name')} (ID: {g.get('id')})" for g in cts]
+                    body_lines.append(f"  └─ 🗃️ *CTs ({len(cts)}):* {', '.join(ct_names)}")
+                if s.get("shutdown_host"):
+                    body_lines.append(f"  └─ ⚡ *Host Físico:* Desligamento ordenado")
+
+                if not res.get("success", True) and res.get("message"):
+                    body_lines.append(f"  └─ ⚠️ *Detalhe:* {res.get('message')}")
+                body_lines.append("")
+
+            body_lines.append(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            body_lines.append(f"📊 *RESUMO FINAL:*")
+            body_lines.append(f"• Total de VMs desligadas: *{total_vms}*")
+            body_lines.append(f"• Total de Containers (CTs): *{total_cts}*")
+            if total_hosts > 0:
+                body_lines.append(f"• Hipervisores físicos desligados: *{total_hosts}*")
+            body_lines.append(f"• Alvos processados: *{len(servers)}*")
+
+            if dry_run:
+                body_lines.append(f"\n🟡 *Nota:* Esta foi uma simulação (Dry-Run). Nenhuma máquina real foi desligada.")
+            else:
+                body_lines.append(f"\n🔒 *A infraestrutura foi desligada de forma segura para preservar a integridade dos dados e do armazenamento.*")
+
+            body_lines.append(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            body_lines.append("Painel: https://10.255.255.28/")
+            body_text = "\n".join(body_lines)
+
+        alert_tag = f"Plano: {plan_name}"
+        sent_emails = set()
+        sent_whatsapps = set()
+        sent_sms = set()
+        sent_teams = set()
+        sent_gchats = set()
+        dispatch_count = 0
+
+        for rec in recipients:
+            for ch in channels:
+                if ch == "email":
+                    target = (rec.get("email") or "").strip()
+                    if target and target.lower() not in sent_emails:
+                        sent_emails.add(target.lower())
+                        self.send_email_notification(rec, subject, body_text, alert_tag, settings.get("smtp", {}))
+                        dispatch_count += 1
+
+                elif ch == "whatsapp":
+                    target = (rec.get("phone_whatsapp") or "").strip()
+                    if target and target not in sent_whatsapps:
+                        sent_whatsapps.add(target)
+                        self.send_whatsapp_notification(rec, body_text, alert_tag, settings.get("whatsapp", {}))
+                        dispatch_count += 1
+
+                elif ch == "sms":
+                    target = (rec.get("phone_sms") or "").strip()
+                    if target and target not in sent_sms:
+                        sent_sms.add(target)
+                        self.send_sms_notification(rec, body_text, alert_tag, settings.get("sms", {}))
+                        dispatch_count += 1
+
+                elif ch == "teams":
+                    rec_teams_url = (rec.get("teams_webhook") or rec.get("webhook_teams") or "").strip()
+                    if rec_teams_url and rec_teams_url not in sent_teams:
+                        sent_teams.add(rec_teams_url)
+                        self.send_teams_notification(rec, rec_teams_url, alert_tag, body_text, f"Execução do plano {plan_name}", nut_data or {}, settings.get("teams", {}))
+                        dispatch_count += 1
+
+                elif ch in ("google_chat", "google"):
+                    rec_gc_url = (rec.get("google_chat_webhook") or rec.get("webhook_google") or "").strip()
+                    if rec_gc_url and rec_gc_url not in sent_gchats:
+                        sent_gchats.add(rec_gc_url)
+                        self.send_google_chat_notification(rec, rec_gc_url, alert_tag, body_text, f"Execução do plano {plan_name}", nut_data or {}, settings.get("google_chat", {}))
+                        dispatch_count += 1
+
+                elif ch == "webhook":
+                    rec_wh_url = (rec.get("webhook_url") or "").strip()
+                    if rec_wh_url:
+                        self.send_webhook_notification(rec, rec_wh_url, {"name": alert_tag, "custom_message": body_text}, f"Execução do plano {plan_name}", nut_data or {})
+                        dispatch_count += 1
+
+        if "teams" in channels:
+            teams_cfg = settings.get("teams", {})
+            g_url = (teams_cfg.get("webhook_url") or "").strip()
+            if teams_cfg.get("enabled", True) and g_url and g_url not in sent_teams:
+                sent_teams.add(g_url)
+                self.send_teams_notification(None, g_url, alert_tag, body_text, f"Execução do plano {plan_name}", nut_data or {}, teams_cfg)
+                dispatch_count += 1
+
+        if "google_chat" in channels or "google" in channels:
+            gc_cfg = settings.get("google_chat", {})
+            g_url = (gc_cfg.get("webhook_url") or "").strip()
+            if gc_cfg.get("enabled", True) and g_url and g_url not in sent_gchats:
+                sent_gchats.add(g_url)
+                self.send_google_chat_notification(None, g_url, alert_tag, body_text, f"Execução do plano {plan_name}", nut_data or {}, gc_cfg)
+                dispatch_count += 1
+
+        return {
+            "success": True,
+            "dispatches": dispatch_count,
+            "recipients_count": len(recipients),
+            "channels": channels,
+            "message": f"Alerta transmitido para {len(recipients)} destinatário(s) em {dispatch_count} disparo(s)."
+        }
+
     def _build_alert_message(self, rule, condition_desc, nut_data):
         now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         status = nut_data.get("status", {})

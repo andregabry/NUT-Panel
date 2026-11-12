@@ -35,6 +35,7 @@ auth_manager = AuthManager()
 alert_manager = AlertManager()
 connections_manager = ConnectionsManager()
 shutdown_manager.connections_manager = connections_manager
+shutdown_manager.alert_manager = alert_manager
 
 latest_data = {
     "connected": False,
@@ -297,6 +298,30 @@ def trigger_single_plan(plan_id):
 def cancel_single_plan(plan_id):
     shutdown_manager.cancel_plan(plan_id)
     return jsonify({"success": True, "message": "Cancelamento solicitado"})
+
+@app.route("/api/plans/<plan_id>/test-notification", methods=["POST"])
+@login_required
+def test_plan_notification(plan_id):
+    plan = shutdown_manager.get_plan_by_id(plan_id)
+    if not plan:
+        return jsonify({"success": False, "message": "Plano não encontrado"}), 404
+
+    sample_results = []
+    for s in plan.get("servers", []):
+        sample_results.append({
+            "server": s.get("name", "Servidor"),
+            "success": True,
+            "message": "Comando de teste executado com sucesso"
+        })
+
+    res = alert_manager.send_shutdown_plan_notification(
+        plan_data=plan,
+        event_type="completed",
+        results=sample_results,
+        dry_run=True,
+        nut_data=latest_data
+    )
+    return jsonify(res)
 
 @app.route("/api/plans/logs", methods=["GET"])
 @login_required

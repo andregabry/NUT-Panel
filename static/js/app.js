@@ -1099,6 +1099,9 @@ function renderPlansTabsAndPanel() {
                     <button onclick="runPlanNow('${activePlan.id}', '${activePlan.name}')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-slate-200 font-bold text-xs transition flex items-center gap-1.5">
                         <i data-lucide="power" class="w-4 h-4"></i> Executar Agora
                     </button>
+                    <button onclick="testPlanNotification('${activePlan.id}', '${escapeHtml(activePlan.name)}')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-enging-navy border border-slate-200 font-bold text-xs transition flex items-center gap-1.5" title="Testar Envio de Notificação aos Contatos">
+                        <i data-lucide="bell" class="w-4 h-4 text-amber-500"></i> Testar Alerta
+                    </button>
                     <button onclick="openCreatePlanModal('${activePlan.id}')" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-enging-navy border border-slate-200 transition" title="Configurações do Plano">
                         <i data-lucide="settings" class="w-4 h-4"></i>
                     </button>
@@ -1109,14 +1112,14 @@ function renderPlansTabsAndPanel() {
             </div>
 
             <!-- Plan Quick Parameters Bar -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50/80 border-b border-slate-100 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 p-4 bg-slate-50/80 border-b border-slate-100 text-xs">
                 <div class="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
                     <div class="p-2.5 rounded-xl bg-orange-50 text-enging-orange">
                         <i data-lucide="zap" class="w-4 h-4"></i>
                     </div>
                     <div>
-                        <span class="text-[11px] text-slate-500 block uppercase font-bold">Nível de Disparo</span>
-                        <strong class="text-sm font-mono font-black text-enging-orange">Bateria ≤ ${activePlan.trigger_battery_pct}%</strong>
+                        <span class="text-[10px] text-slate-400 block uppercase font-bold">Nível de Disparo</span>
+                        <strong class="text-xs font-mono font-black text-enging-orange">Bateria ≤ ${activePlan.trigger_battery_pct}%</strong>
                     </div>
                 </div>
 
@@ -1125,8 +1128,8 @@ function renderPlansTabsAndPanel() {
                         <i data-lucide="clock" class="w-4 h-4"></i>
                     </div>
                     <div>
-                        <span class="text-[11px] text-slate-500 block uppercase font-bold">Tempo de Carência</span>
-                        <strong class="text-sm font-mono font-black text-enging-navy">${activePlan.grace_period_sec || 10} segundos</strong>
+                        <span class="text-[10px] text-slate-400 block uppercase font-bold">Carência</span>
+                        <strong class="text-xs font-mono font-black text-enging-navy">${activePlan.grace_period_sec || 10} segundos</strong>
                     </div>
                 </div>
 
@@ -1135,8 +1138,22 @@ function renderPlansTabsAndPanel() {
                         <i data-lucide="shield-check" class="w-4 h-4"></i>
                     </div>
                     <div>
-                        <span class="text-[11px] text-slate-500 block uppercase font-bold">Condição Obrigatória</span>
-                        <strong class="text-sm font-bold text-emerald-700">${activePlan.require_on_battery ? 'Modo Bateria (OB)' : 'Qualquer Modo'}</strong>
+                        <span class="text-[10px] text-slate-400 block uppercase font-bold">Condição</span>
+                        <strong class="text-xs font-bold text-emerald-700">${activePlan.require_on_battery ? 'Em Bateria (OB)' : 'Qualquer Modo'}</strong>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
+                    <div class="p-2.5 rounded-xl ${activePlan.notifications && activePlan.notifications.enabled ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-400'}">
+                        <i data-lucide="${activePlan.notifications && activePlan.notifications.enabled ? 'bell-ring' : 'bell-off'}" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block uppercase font-bold">Alertas aos Contatos</span>
+                        <strong class="text-xs font-bold ${activePlan.notifications && activePlan.notifications.enabled ? 'text-amber-700' : 'text-slate-400'}">
+                            ${activePlan.notifications && activePlan.notifications.enabled 
+                                ? `${(activePlan.notifications.recipient_ids && activePlan.notifications.recipient_ids.length > 0) ? activePlan.notifications.recipient_ids.length + ' contato(s)' : 'Todos os contatos'}`
+                                : 'Desativados'}
+                        </strong>
                     </div>
                 </div>
             </div>
@@ -1191,7 +1208,7 @@ function updateActivePlanStatusUI(plan) {
     }
 }
 
-function openCreatePlanModal(planId = null) {
+async function openCreatePlanModal(planId = null) {
     const isEdit = !!planId;
     const p = isEdit ? (allPlansData.plans || []).find(x => x.id === planId) : {
         id: '',
@@ -1200,25 +1217,82 @@ function openCreatePlanModal(planId = null) {
         trigger_battery_pct: 50.0,
         require_on_battery: true,
         grace_period_sec: 10,
-        enabled: true
+        enabled: true,
+        notifications: {
+            enabled: true,
+            notify_on_trigger: true,
+            notify_on_completion: true,
+            recipient_ids: [],
+            channels: ['whatsapp', 'email']
+        }
     };
 
     if (!p) return;
 
+    // Obter dados atualizados de alertas e contatos
+    let freshAlertsData = allAlertsData;
+    try {
+        const alRes = await fetch('/api/alerts');
+        if (alRes.ok) {
+            freshAlertsData = await alRes.json();
+            allAlertsData = freshAlertsData;
+        }
+    } catch (e) {
+        console.error('Falha ao carregar contatos de alertas:', e);
+    }
+
+    const recipientsList = freshAlertsData.recipients || [];
+    const notif = p.notifications || {
+        enabled: true,
+        notify_on_trigger: true,
+        notify_on_completion: true,
+        recipient_ids: [],
+        channels: ['whatsapp', 'email']
+    };
+    const savedRecIds = new Set(notif.recipient_ids || []);
+    const savedChannels = new Set(notif.channels || ['whatsapp', 'email']);
+
+    let recsHtml = '';
+    if (recipientsList.length === 0) {
+        recsHtml = '<p class="text-xs text-slate-400 italic p-2 bg-white rounded-xl border border-slate-200">Nenhum destinatário cadastrado em Conexões > Alertas.</p>';
+    } else {
+        recsHtml = recipientsList.map(r => {
+            const isChecked = savedRecIds.size === 0 || savedRecIds.has(r.id);
+            const phone = r.phone_whatsapp || r.phone_sms || '';
+            const email = r.email || '';
+            return `
+                <label class="flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition select-none">
+                    <div class="flex items-center gap-2.5">
+                        <input type="checkbox" value="${r.id}" class="swal-plan-rec-chk w-4 h-4 rounded text-enging-orange focus:ring-enging-orange border-slate-300" ${isChecked ? 'checked' : ''}>
+                        <div>
+                            <div class="font-bold text-slate-800 text-xs">${escapeHtml(r.name)}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(email || phone)}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        ${phone ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">WhatsApp</span>' : ''}
+                        ${email ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Email</span>' : ''}
+                    </div>
+                </label>
+            `;
+        }).join('');
+    }
+
     swalEnging.fire({
         title: isEdit ? 'Editar Plano de Desligamento' : 'Criar Novo Plano de Desligamento',
+        width: '640px',
         html: `
-            <div class="text-left space-y-3.5 mt-2 font-sans">
+            <div class="text-left space-y-3.5 mt-2 font-sans text-xs">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Plano</label>
-                    <input id="swal-plan-name" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" placeholder="Ex: Estágio 1 - VMs Dev (60%)" value="${p.name}">
+                    <input id="swal-plan-name" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange font-medium" placeholder="Ex: Estágio 1 - VMs Dev (60%)" value="${escapeHtml(p.name)}">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Descrição / Finalidade</label>
-                    <input id="swal-plan-desc" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" placeholder="Ex: Desliga máquinas virtuais não críticas" value="${p.description || ''}">
+                    <input id="swal-plan-desc" class="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" placeholder="Ex: Desliga máquinas virtuais não críticas" value="${escapeHtml(p.description || '')}">
                 </div>
                 
-                <div class="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="block text-xs font-bold text-enging-orange uppercase">Trigger Bateria</label>
@@ -1229,28 +1303,119 @@ function openCreatePlanModal(planId = null) {
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Carência (s)</label>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Carência de Segurança (s)</label>
                         <input id="swal-plan-grace" type="number" min="0" max="300" class="w-full px-3 py-1.5 text-xs font-mono rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-enging-orange" value="${p.grace_period_sec || 10}">
-                        <p class="text-[10px] text-slate-500 mt-1">Tempo antes de iniciar</p>
+                        <p class="text-[10px] text-slate-500 mt-1">Tempo de espera antes de iniciar</p>
                     </div>
                 </div>
 
-                <div class="space-y-2 pt-1">
-                    <div class="flex items-center gap-2">
+                <div class="grid grid-cols-2 gap-3 pt-1">
+                    <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer select-none">
                         <input type="checkbox" id="swal-plan-req-batt" ${p.require_on_battery ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-enging-orange focus:ring-enging-orange">
-                        <label for="swal-plan-req-batt" class="text-xs text-slate-700 font-medium cursor-pointer">Exigir que a UPS esteja em modo de bateria (OB)</label>
-                    </div>
-                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-700 font-medium">Exigir Modo Bateria (OB)</span>
+                    </label>
+                    <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer select-none">
                         <input type="checkbox" id="swal-plan-enabled" ${p.enabled ? 'checked' : ''} class="w-4 h-4 rounded border-slate-300 text-enging-orange focus:ring-enging-orange">
-                        <label for="swal-plan-enabled" class="text-xs text-slate-700 font-medium cursor-pointer">Plano Ativado para Disparo Automático</label>
+                        <span class="text-xs text-slate-700 font-bold text-enging-navy">Plano Ativado</span>
+                    </label>
+                </div>
+
+                <!-- SEÇÃO DE NOTIFICAÇÕES & ALERTAS -->
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label for="swal-plan-notif-enabled" class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="swal-plan-notif-enabled" onchange="window.togglePlanNotifBox()" ${notif.enabled ? 'checked' : ''} class="w-4 h-4 rounded text-enging-orange focus:ring-enging-orange border-slate-300">
+                            <span class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <i data-lucide="bell" class="w-4 h-4 text-enging-orange"></i>
+                                <span>Enviar Alertas aos Contatos na Execução</span>
+                            </span>
+                        </label>
+                        <span class="text-[10px] text-slate-400 font-mono">Notificações</span>
+                    </div>
+
+                    <div id="swal-plan-notif-box" class="space-y-3 pt-2 border-t border-slate-200/60 ${notif.enabled ? '' : 'hidden'}">
+                        <!-- Momentos de Envio -->
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1.5">Momentos de Envio</label>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <label class="flex items-center gap-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer select-none">
+                                    <input type="checkbox" id="swal-plan-notif-trigger" ${notif.notify_on_trigger !== false ? 'checked' : ''} class="w-4 h-4 rounded text-enging-orange border-slate-300">
+                                    <span class="text-[11px] text-slate-700 font-medium">Ao Iniciar Carência</span>
+                                </label>
+                                <label class="flex items-center gap-2 p-2 rounded-xl bg-white border border-slate-200 cursor-pointer select-none">
+                                    <input type="checkbox" id="swal-plan-notif-completion" ${notif.notify_on_completion !== false ? 'checked' : ''} class="w-4 h-4 rounded text-enging-orange border-slate-300">
+                                    <span class="text-[11px] text-slate-700 font-bold text-enging-navy">Ao Concluir (Relatório de VMs)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Canais de Envio -->
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1.5">Canais Ativos</label>
+                            <div class="flex flex-wrap gap-2 text-xs">
+                                <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 cursor-pointer select-none">
+                                    <input type="checkbox" value="whatsapp" class="swal-plan-channel-chk w-4 h-4 rounded text-emerald-600 border-slate-300" ${savedChannels.has('whatsapp') ? 'checked' : ''}>
+                                    <span class="text-[11px] font-bold text-emerald-800">WhatsApp</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 cursor-pointer select-none">
+                                    <input type="checkbox" value="email" class="swal-plan-channel-chk w-4 h-4 rounded text-blue-600 border-slate-300" ${savedChannels.has('email') ? 'checked' : ''}>
+                                    <span class="text-[11px] font-bold text-blue-800">E-mail (SMTP)</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 cursor-pointer select-none">
+                                    <input type="checkbox" value="teams" class="swal-plan-channel-chk w-4 h-4 rounded text-indigo-600 border-slate-300" ${savedChannels.has('teams') ? 'checked' : ''}>
+                                    <span class="text-[11px] font-medium text-slate-700">MS Teams</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 cursor-pointer select-none">
+                                    <input type="checkbox" value="google_chat" class="swal-plan-channel-chk w-4 h-4 rounded text-emerald-600 border-slate-300" ${savedChannels.has('google_chat') ? 'checked' : ''}>
+                                    <span class="text-[11px] font-medium text-slate-700">Google Chat</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 cursor-pointer select-none">
+                                    <input type="checkbox" value="webhook" class="swal-plan-channel-chk w-4 h-4 rounded text-purple-600 border-slate-300" ${savedChannels.has('webhook') ? 'checked' : ''}>
+                                    <span class="text-[11px] font-medium text-slate-700">Webhook</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Contatos Selecionados -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase">Destinatários Selecionados</label>
+                                <div class="space-x-1.5">
+                                    <button type="button" onclick="window.selectAllPlanRecs(true)" class="text-[10px] text-enging-orange hover:underline font-bold">Todos</button>
+                                    <span class="text-slate-300">|</span>
+                                    <button type="button" onclick="window.selectAllPlanRecs(false)" class="text-[10px] text-slate-400 hover:underline">Limpar</button>
+                                </div>
+                            </div>
+                            <div class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                                ${recsHtml}
+                            </div>
+                        </div>
                     </div>
                 </div>
+
             </div>
         `,
         showCancelButton: true,
         confirmButtonText: isEdit ? 'Atualizar Plano' : 'Criar Plano',
         cancelButtonText: 'Cancelar',
         focusConfirm: false,
+        didOpen: () => {
+            lucide.createIcons();
+
+            window.togglePlanNotifBox = () => {
+                const chk = document.getElementById('swal-plan-notif-enabled');
+                const box = document.getElementById('swal-plan-notif-box');
+                if (chk && box) {
+                    if (chk.checked) box.classList.remove('hidden');
+                    else box.classList.add('hidden');
+                }
+            };
+
+            window.selectAllPlanRecs = (select) => {
+                const boxes = document.querySelectorAll('.swal-plan-rec-chk');
+                boxes.forEach(cb => { cb.checked = select; });
+            };
+        },
         preConfirm: () => {
             const name = document.getElementById('swal-plan-name').value.trim();
             const description = document.getElementById('swal-plan-desc').value.trim();
@@ -1264,6 +1429,12 @@ function openCreatePlanModal(planId = null) {
                 return false;
             }
 
+            const notifEnabled = document.getElementById('swal-plan-notif-enabled')?.checked || false;
+            const notifyTrigger = document.getElementById('swal-plan-notif-trigger')?.checked || false;
+            const notifyCompletion = document.getElementById('swal-plan-notif-completion')?.checked || false;
+            const recIds = Array.from(document.querySelectorAll('.swal-plan-rec-chk:checked')).map(cb => cb.value);
+            const channels = Array.from(document.querySelectorAll('.swal-plan-channel-chk:checked')).map(cb => cb.value);
+
             return {
                 id: p.id || undefined,
                 name,
@@ -1271,7 +1442,14 @@ function openCreatePlanModal(planId = null) {
                 trigger_battery_pct,
                 grace_period_sec,
                 require_on_battery,
-                enabled
+                enabled,
+                notifications: {
+                    enabled: notifEnabled,
+                    notify_on_trigger: notifyTrigger,
+                    notify_on_completion: notifyCompletion,
+                    recipient_ids: recIds,
+                    channels: channels.length > 0 ? channels : ['whatsapp', 'email']
+                }
             };
         }
     }).then(async (result) => {
@@ -1297,6 +1475,51 @@ function openCreatePlanModal(planId = null) {
                 }
             } catch (e) {
                 swalEnging.fire('Erro', 'Falha ao salvar plano: ' + e, 'error');
+            }
+        }
+    });
+}
+
+async function testPlanNotification(planId, planName) {
+    swalEnging.fire({
+        title: `Testar Alerta de [${planName}]?`,
+        html: `
+            <p class="text-xs text-slate-600 mb-2">Isto enviará imediatamente um alerta com o relatório detalhado deste plano aos contatos configurados (WhatsApp, E-mail, etc.).</p>
+            <p class="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-xl border border-amber-200">ℹ️ O relatório indicará que se trata de um teste / simulação segura.</p>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Disparar Teste de Alerta',
+        cancelButtonText: 'Cancelar'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            swalEnging.fire({
+                title: 'A Enviar Alerta...',
+                text: 'Aguarde a transmissão para os contatos e canais selecionados.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+            try {
+                const res = await fetch(`/api/plans/${planId}/test-notification`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    swalEnging.fire({
+                        icon: 'success',
+                        title: 'Alerta Enviado com Sucesso!',
+                        html: `<p class="text-xs text-slate-600">${escapeHtml(data.message || 'Notificação transmitida aos contatos.')}</p>`,
+                        timer: 2500,
+                        showConfirmButton: false
+                    });
+                } else {
+                    swalEnging.fire('Aviso', data.message || 'Falha ao enviar notificação.', 'warning');
+                }
+            } catch (e) {
+                swalEnging.fire('Erro', 'Falha ao comunicar com o servidor: ' + e, 'error');
             }
         }
     });
