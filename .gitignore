@@ -56,3 +56,7 @@ yarn-error.log*
 *~
 .DS_Store
 Thumbs.db
+
+
+alerts_data.json
+connections_data.json

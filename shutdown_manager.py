@@ -21,6 +21,9 @@ class ShutdownManager:
         self.plans_file = plans_file
         self.lock = threading.Lock()
         self.active_threads: Dict[str, threading.Thread] = {}
+        self.connections_manager = None
+        self.alert_manager = None
+        self.latest_nut_data = {}
         self._load_data()
 
     def _get_default_data(self) -> Dict[str, Any]:
@@ -250,6 +253,25 @@ class ShutdownManager:
                 raise ValueError("Plano não encontrado")
             
             server_id = server_payload.get("id")
+            conn_id = server_payload.get("connection_id")
+            new_guests = server_payload.get("selected_guests", [])
+
+            # Validar que nenhuma VM/CT já está atribuída a outro plano ou alvo
+            if conn_id and new_guests:
+                for other_plan in self.data.get("plans", []):
+                    for other_srv in other_plan.get("servers", []):
+                        # Ignora o próprio alvo que está sendo editado
+                        if other_plan["id"] == plan_id and other_srv.get("id") == server_id:
+                            continue
+                        if other_srv.get("connection_id") == conn_id:
+                            for og in other_srv.get("selected_guests", []):
+                                for ng in new_guests:
+                                    if str(ng.get("id")) == str(og.get("id")) and ng.get("type", "qemu") == og.get("type", "qemu"):
+                                        target_name = ng.get("name") or ng.get("id")
+                                        raise ValueError(
+                                            f"A VM/CT '{target_name}' (ID: {ng.get('id')}) já foi selecionada como alvo no plano '{other_plan.get('name')}'."
+                                        )
+
             if not server_id:
                 server_id = str(uuid.uuid4())
                 server_payload["id"] = server_id
@@ -298,8 +320,31 @@ class ShutdownManager:
             self.add_log_unlocked(level, message, server_name, details)
             self._save_data_unlocked()
 
+    def _resolve_server_credentials(self, server: Dict[str, Any]) -> Dict[str, Any]:
+        """Resolve credenciais herdadas do connections_manager se houver connection_id."""
+        s = dict(server)
+        conn_id = s.get("connection_id")
+        conn_type = s.get("connection_type", "proxmox")
+        if conn_id and getattr(self, "connections_manager", None):
+            creds = self.connections_manager.get_server_credentials(conn_type, conn_id)
+            if creds:
+                if not s.get("host") or s.get("host") == "127.0.0.1":
+                    s["host"] = creds.get("host", s.get("host"))
+                if not s.get("port"):
+                    s["port"] = creds.get("port", 22)
+                if not s.get("username"):
+                    s["username"] = creds.get("username", "root")
+                if not s.get("password") or s.get("password") == "••••••••":
+                    s["password"] = creds.get("password", "")
+                if "private_key" in creds and not s.get("private_key"):
+                    s["private_key"] = creds.get("private_key", "")
+                if "sudo" in creds and "sudo" not in s:
+                    s["sudo"] = creds.get("sudo", False)
+        return s
+
     def test_connection(self, server: Dict[str, Any]) -> Dict[str, Any]:
         """Testa conexão ao servidor ou VM sem desligar."""
+        server = self._resolve_server_credentials(server)
         method = server.get("method", "ssh")
         host = server.get("host", "").strip()
         port = int(server.get("port", 22))
@@ -333,10 +378,19 @@ class ShutdownManager:
             try:
                 username = server.get("username", "root")
                 password = server.get("password") or None
-                ssh.connect(host, port=port, username=username, password=password, timeout=6)
+                connect_kwargs = {"hostname": host, "port": port, "username": username, "timeout": 35}
+                if server.get("private_key"):
+                    import io
+                    try:
+                        connect_kwargs["pkey"] = paramiko.RSAKey.from_private_key(io.StringIO(server["private_key"]))
+                    except Exception:
+                        connect_kwargs["pkey"] = paramiko.Ed25519Key.from_private_key(io.StringIO(server["private_key"]))
+                elif password:
+                    connect_kwargs["password"] = password
+                ssh.connect(**connect_kwargs)
                 
                 test_cmd = "hostname && uname -a" if method == "ssh" else "hostname"
-                stdin, stdout, stderr = ssh.exec_command(test_cmd, timeout=5)
+                stdin, stdout, stderr = ssh.exec_command(test_cmd, timeout=15)
                 output = stdout.read().decode('utf-8', errors='replace').strip()
                 ssh.close()
                 
@@ -377,7 +431,9 @@ class ShutdownManager:
 
     def execute_shutdown_server(self, server: Dict[str, Any], plan_name: str = "", dry_run: bool = False) -> Dict[str, Any]:
         """Executa a ordem de desligamento para um servidor específico."""
+        server = self._resolve_server_credentials(server)
         name = server.get("name", "Servidor")
+        server = self._resolve_server_credentials(server)
         method = server.get("method", "ssh")
         host = server.get("host", "").strip()
         port = int(server.get("port", 22))
@@ -411,7 +467,16 @@ class ShutdownManager:
             try:
                 username = server.get("username", "root")
                 password = server.get("password") or None
-                ssh.connect(host, port=port, username=username, password=password, timeout=8)
+                connect_kwargs = {"hostname": host, "port": port, "username": username, "timeout": 35}
+                if server.get("private_key"):
+                    import io
+                    try:
+                        connect_kwargs["pkey"] = paramiko.RSAKey.from_private_key(io.StringIO(server["private_key"]))
+                    except Exception:
+                        connect_kwargs["pkey"] = paramiko.Ed25519Key.from_private_key(io.StringIO(server["private_key"]))
+                elif password:
+                    connect_kwargs["password"] = password
+                ssh.connect(**connect_kwargs)
                 
                 cmd = server.get("custom_command", "").strip()
                 if not cmd:
@@ -459,6 +524,13 @@ class ShutdownManager:
                 plan["state"]["status"] = "cancelled"
                 self.add_log_unlocked("info", f"Execução do plano '{plan.get('name')}' foi cancelada manualmente.", server_name=plan.get("name"))
                 self._save_data_unlocked()
+                if self.alert_manager:
+                    try:
+                        self.alert_manager.send_shutdown_plan_notification(
+                            plan, "cancelled", nut_data=self.latest_nut_data
+                        )
+                    except Exception as e:
+                        logger.error(f"Erro ao disparar alerta de cancelamento: {e}")
 
     def run_plan_async(self, plan_id: str, dry_run: bool = False) -> None:
         """Executa um plano específico de forma assíncrona respeitando carência e delays."""
@@ -477,6 +549,14 @@ class ShutdownManager:
             servers = [s for s in plan.get("servers", []) if s.get("enabled", True)]
 
         self.add_log("warning", f"Iniciando contagem de segurança ({grace}s) para o plano '{plan_name}'...", server_name=plan_name)
+
+        if self.alert_manager:
+            try:
+                self.alert_manager.send_shutdown_plan_notification(
+                    plan, "triggered", dry_run=dry_run, nut_data=self.latest_nut_data
+                )
+            except Exception as e:
+                logger.error(f"Erro ao disparar alerta de início de plano: {e}")
 
         def worker():
             # Countdown
@@ -519,12 +599,21 @@ class ShutdownManager:
 
             self.add_log("info", f"Plano '{plan_name}' concluído com sucesso.", server_name=plan_name)
 
+            if self.alert_manager:
+                try:
+                    self.alert_manager.send_shutdown_plan_notification(
+                        plan, "completed", results=plan["state"]["results"], dry_run=dry_run, nut_data=self.latest_nut_data
+                    )
+                except Exception as e:
+                    logger.error(f"Erro ao disparar alerta de conclusão de plano: {e}")
+
         t = threading.Thread(target=worker, daemon=True)
         self.active_threads[plan_id] = t
         t.start()
 
     def check_nut_triggers(self, nut_data: Dict[str, Any]) -> None:
         """Verifica os gatilhos de bateria individualmente para cada plano configurado."""
+        self.latest_nut_data = nut_data
         status = nut_data.get("status", {})
         battery = nut_data.get("battery", {})
 

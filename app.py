@@ -34,6 +34,8 @@ shutdown_manager = ShutdownManager()
 auth_manager = AuthManager()
 alert_manager = AlertManager()
 connections_manager = ConnectionsManager()
+shutdown_manager.connections_manager = connections_manager
+shutdown_manager.alert_manager = alert_manager
 
 latest_data = {
     "connected": False,
@@ -297,6 +299,30 @@ def cancel_single_plan(plan_id):
     shutdown_manager.cancel_plan(plan_id)
     return jsonify({"success": True, "message": "Cancelamento solicitado"})
 
+@app.route("/api/plans/<plan_id>/test-notification", methods=["POST"])
+@login_required
+def test_plan_notification(plan_id):
+    plan = shutdown_manager.get_plan_by_id(plan_id)
+    if not plan:
+        return jsonify({"success": False, "message": "Plano não encontrado"}), 404
+
+    sample_results = []
+    for s in plan.get("servers", []):
+        sample_results.append({
+            "server": s.get("name", "Servidor"),
+            "success": True,
+            "message": "Comando de teste executado com sucesso"
+        })
+
+    res = alert_manager.send_shutdown_plan_notification(
+        plan_data=plan,
+        event_type="completed",
+        results=sample_results,
+        dry_run=True,
+        nut_data=latest_data
+    )
+    return jsonify(res)
+
 @app.route("/api/plans/logs", methods=["GET"])
 @login_required
 def get_all_logs():
@@ -437,6 +463,24 @@ def generate_api_token():
 def delete_api_token(token_id):
     success = connections_manager.delete_api_token(token_id)
     return jsonify({"success": success})
+
+# Endpoints de Servidores e Guests (VMs / CTs) para Planos de Desligamento
+@app.route("/api/connections/servers-summary", methods=["GET"])
+@login_required
+def get_connections_servers_summary():
+    return jsonify(connections_manager.get_registered_servers())
+
+@app.route("/api/connections/proxmox/<server_id>/guests", methods=["GET"])
+@login_required
+def get_proxmox_guests_endpoint(server_id):
+    force_refresh = request.args.get("refresh") == "1"
+    return jsonify(connections_manager.get_proxmox_guests(server_id, force_refresh=force_refresh))
+
+@app.route("/api/connections/vmware/<server_id>/guests", methods=["GET"])
+@login_required
+def get_vmware_guests_endpoint(server_id):
+    force_refresh = request.args.get("refresh") == "1"
+    return jsonify(connections_manager.get_vmware_guests(server_id, force_refresh=force_refresh))
 
 # Endpoint de API REST Externa v1 com suporte a Token Bearer
 @app.route("/api/v1/status", methods=["GET"])
