@@ -11,6 +11,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
+from db import db
+
 logger = logging.getLogger(__name__)
 
 ALERTS_FILE = os.path.join(os.path.dirname(__file__), "alerts_data.json")
@@ -148,20 +150,104 @@ class AlertManager:
         self.lock = threading.Lock()
         self.state_tracking = {}  # Tracks triggers: last_triggered_time, condition_start_time, was_triggered
         self.last_status_was_on_battery = False
+        self.last_status_was_disconnected = False
         self._load()
 
     def _load(self):
         with self.lock:
-            if not os.path.exists(self.filepath):
-                self._save_unlocked(DEFAULT_ALERTS_DATA)
-                self.data = DEFAULT_ALERTS_DATA
-            else:
-                try:
-                    with open(self.filepath, "r", encoding="utf-8") as f:
-                        self.data = json.load(f)
-                except Exception as e:
-                    logger.error(f"Erro ao carregar ficheiro de alertas: {e}")
+            try:
+                db_rules = db.get_alert_rules()
+                if db_rules:
+                    recs = db.get_recipients()
+                    c_settings = db.get_system_setting("channel_settings", DEFAULT_ALERTS_DATA["channel_settings"])
+                    logs = db.get_alert_logs(limit=150)
+                    self.data = {
+                        "recipients": recs,
+                        "channel_settings": c_settings,
+                        "rules": db_rules,
+                        "logs": logs
+                    }
+                    logger.info(f"Alertas carregados da base SQLite: {len(db_rules)} regras, {len(recs)} contactos.")
+                else:
+                    raise ValueError("Nenhuma regra no SQLite")
+            except Exception as e:
+                logger.info(f"A carregar alertas do ficheiro JSON/defaults ({e})...")
+                if not os.path.exists(self.filepath):
                     self.data = DEFAULT_ALERTS_DATA
+                else:
+                    try:
+                        with open(self.filepath, "r", encoding="utf-8") as f:
+                            self.data = json.load(f)
+                    except Exception as ex:
+                        logger.error(f"Erro ao carregar ficheiro de alertas: {ex}")
+                        self.data = DEFAULT_ALERTS_DATA
+                self._save_unlocked(self.data)
+
+            # Auto-provisiona regras de desconexão e reconexão se não existirem
+            existing_types = {r.get("trigger_type") for r in self.data.get("rules", [])}
+            default_recs = [r.get("id") for r in self.data.get("recipients", [])] or ["rec-1"]
+            default_channels = ["whatsapp", "teams"]
+            modified = False
+
+            if "ups_disconnected" not in existing_types:
+                self.data.setdefault("rules", []).append({
+                    "id": "rule-ups-disconnected",
+                    "name": "Falha de Comunicação / UPS Desconectada",
+                    "description": "Alerta imediato quando a leitura da UPS falha (cabo USB desconectado, porta serial ou serviço do driver inativo).",
+                    "trigger_type": "ups_disconnected",
+                    "threshold_val": 0,
+                    "threshold_val_max": 0,
+                    "require_duration_sec": 5,
+                    "cooldown_min": 15,
+                    "enabled": True,
+                    "channels": default_channels,
+                    "recipient_ids": default_recs,
+                    "custom_message": ""
+                })
+                modified = True
+
+            if "ups_reconnected" not in existing_types:
+                self.data.setdefault("rules", []).append({
+                    "id": "rule-ups-reconnected",
+                    "name": "Comunicação com a UPS Restabelecida",
+                    "description": "Notifica quando a ligação à UPS é restabelecida com sucesso e a telemetria volta a responder.",
+                    "trigger_type": "ups_reconnected",
+                    "threshold_val": 0,
+                    "threshold_val_max": 0,
+                    "require_duration_sec": 2,
+                    "cooldown_min": 5,
+                    "enabled": True,
+                    "channels": default_channels,
+                    "recipient_ids": default_recs,
+                    "custom_message": ""
+                })
+                modified = True
+
+            if modified:
+                self._save_unlocked(self.data)
+
+            # Carregar ou reconstruir histórico de last_notified para cada regra
+            logs = self.data.get("logs", [])
+            for r in self.data.get("rules", []):
+                rid = r.get("id")
+                last_notif = r.get("last_notified")
+                if not last_notif:
+                    # Tenta recuperar o timestamp do último envio nos logs
+                    r_name = r.get("name")
+                    for l in logs:
+                        if l.get("alert_name") == r_name and l.get("timestamp"):
+                            last_notif = float(l.get("timestamp"))
+                            r["last_notified"] = last_notif
+                            modified = True
+                            break
+                self.state_tracking[rid] = {
+                    "start_time": 0,
+                    "last_notified": float(last_notif or 0),
+                    "active": False
+                }
+
+            if modified:
+                self._save_unlocked(self.data)
 
     def _save(self):
         with self.lock:
@@ -169,6 +255,13 @@ class AlertManager:
 
     def _save_unlocked(self, data):
         try:
+            if "channel_settings" in data:
+                db.save_system_setting("channel_settings", data["channel_settings"])
+            for r in data.get("recipients", []):
+                db.save_recipient(r)
+            for rule in data.get("rules", []):
+                db.save_alert_rule(rule)
+            # Salva também ficheiro JSON para redundância
             with open(self.filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception as e:
@@ -199,6 +292,10 @@ class AlertManager:
 
     def delete_recipient(self, rec_id):
         with self.lock:
+            try:
+                db.delete_recipient(rec_id)
+            except Exception as e:
+                logger.warning(f"Erro ao remover destinatário do SQLite: {e}")
             recs = self.data.setdefault("recipients", [])
             self.data["recipients"] = [r for r in recs if r["id"] != rec_id]
             # Remove from rules as well
@@ -221,14 +318,33 @@ class AlertManager:
             else:
                 idx = next((i for i, r in enumerate(rules) if r["id"] == rule_id), None)
                 if idx is not None:
+                    # Preserva last_notified ao editar a regra
+                    existing_last = rules[idx].get("last_notified", 0)
+                    if not rule.get("last_notified") and existing_last:
+                        rule["last_notified"] = existing_last
                     rules[idx] = rule
                 else:
                     rules.append(rule)
+
+            # Mantém state_tracking sincronizado
+            if rule_id in self.state_tracking:
+                self.state_tracking[rule_id]["last_notified"] = float(rule.get("last_notified", 0))
+            else:
+                self.state_tracking[rule_id] = {
+                    "start_time": 0,
+                    "last_notified": float(rule.get("last_notified", 0)),
+                    "active": False
+                }
+
             self._save_unlocked(self.data)
             return rule
 
     def delete_rule(self, rule_id):
         with self.lock:
+            try:
+                db.delete_alert_rule(rule_id)
+            except Exception as e:
+                logger.warning(f"Erro ao remover regra do SQLite: {e}")
             rules = self.data.setdefault("rules", [])
             self.data["rules"] = [r for r in rules if r["id"] != rule_id]
             self._save_unlocked(self.data)
@@ -243,6 +359,10 @@ class AlertManager:
     # ---------------- DISPATCH & LOGS ---------------- #
 
     def log_notification(self, alert_name, recipient_name, channel, success, message, detail=""):
+        try:
+            db.add_alert_log(alert_name, recipient_name, channel, success, message, detail)
+        except Exception as e:
+            logger.warning(f"Erro ao salvar log de alerta no SQLite: {e}")
         log_entry = {
             "id": f"log-{int(time.time() * 1000)}",
             "timestamp": time.time(),
@@ -263,21 +383,23 @@ class AlertManager:
 
     def check_nut_alerts(self, nut_data):
         """Avalia todas as regras de alerta contra os dados em tempo real da UPS."""
-        if not nut_data or not nut_data.get("connected"):
+        if not nut_data:
             return
 
+        is_conn = nut_data.get("connected", False)
         status = nut_data.get("status", {})
         batt = nut_data.get("battery", {})
         inp = nut_data.get("input", {})
         out = nut_data.get("output", {})
+        err_msg = nut_data.get("error", "Sem resposta do daemon NUT")
 
         is_on_battery = status.get("is_on_battery", False)
         is_online = status.get("is_online", False)
         has_alarm = status.get("has_alarm", False)
-        batt_charge = batt.get("charge_pct", 100.0)
-        batt_voltage = batt.get("voltage", 0.0)
-        load_pct = out.get("load_pct", 0.0)
-        input_voltage = inp.get("voltage", 0.0)
+        batt_charge = batt.get("charge_pct", 100.0) if is_conn else 0.0
+        batt_voltage = batt.get("voltage", 0.0) if is_conn else 0.0
+        load_pct = out.get("load_pct", 0.0) if is_conn else 0.0
+        input_voltage = inp.get("voltage", 0.0) if is_conn else 0.0
 
         now = time.time()
         rules = self.data.get("rules", [])
@@ -290,14 +412,33 @@ class AlertManager:
             ttype = rule.get("trigger_type")
             thresh = float(rule.get("threshold_val", 0))
             thresh_max = float(rule.get("threshold_val_max", 0))
-            cooldown_sec = rule.get("cooldown_min", 15) * 60
-            req_duration = rule.get("require_duration_sec", 0)
+            try:
+                cooldown_min = float(rule.get("cooldown_min") if rule.get("cooldown_min") is not None else 15)
+            except (ValueError, TypeError):
+                cooldown_min = 15.0
+            cooldown_sec = max(10, cooldown_min * 60)
+            req_duration = int(float(rule.get("require_duration_sec", 0)))
 
             # Check if condition is currently active
             condition_met = False
             condition_desc = ""
 
-            if ttype == "on_battery":
+            if ttype == "ups_disconnected":
+                condition_met = not is_conn
+                clean_err = str(err_msg).replace("ConnectionError: ", "").strip()
+                condition_desc = f"A leitura da UPS falhou! O sistema não consegue comunicar com a UPS. Causa: {clean_err}. Verifique a conexão USB/Serial (/dev/ups-usb) e o serviço do driver."
+
+            elif ttype == "ups_reconnected":
+                # Dispara quando volta a responder após ter estado desconectada
+                if self.last_status_was_disconnected and is_conn:
+                    condition_met = True
+                    condition_desc = "A comunicação com a UPS foi restabelecida com sucesso! A telemetria e o estado voltaram ao normal."
+
+            elif not is_conn:
+                # Se a UPS está desconectada, NENHUMA outra regra deve disparar!
+                condition_met = False
+
+            elif ttype == "on_battery":
                 condition_met = is_on_battery
                 condition_desc = "Falta de energia elétrica! UPS está a funcionar em modo Bateria."
             elif ttype == "power_restored":
@@ -328,9 +469,13 @@ class AlertManager:
             # State tracking per rule
             st = self.state_tracking.setdefault(rule_id, {
                 "start_time": 0,
-                "last_notified": 0,
+                "last_notified": float(rule.get("last_notified", 0)),
                 "active": False
             })
+
+            # Sincroniza last_notified se o rule tiver valor persistido mais recente
+            if rule.get("last_notified") and float(rule["last_notified"]) > st["last_notified"]:
+                st["last_notified"] = float(rule["last_notified"])
 
             if condition_met:
                 if not st["active"]:
@@ -343,6 +488,10 @@ class AlertManager:
                 # Fire notification if duration met and cooldown elapsed
                 if duration >= req_duration and time_since_last >= cooldown_sec:
                     st["last_notified"] = now
+                    rule["last_notified"] = now
+                    with self.lock:
+                        self._save_unlocked(self.data)
+
                     # Launch dispatch in background thread
                     threading.Thread(
                         target=self._dispatch_rule_notifications,
@@ -353,8 +502,12 @@ class AlertManager:
                 st["active"] = False
                 st["start_time"] = 0
 
-        # Atualiza histórico de modo bateria
-        self.last_status_was_on_battery = is_on_battery
+        # Atualiza histórico de modo bateria e de desconexão
+        if is_conn:
+            self.last_status_was_on_battery = is_on_battery
+            self.last_status_was_disconnected = False
+        else:
+            self.last_status_was_disconnected = True
 
     def _dispatch_rule_notifications(self, rule, condition_desc, nut_data):
         """Envia alertas para todos os destinatários e canais configurados na regra, sem qualquer duplicação."""
@@ -515,6 +668,48 @@ class AlertManager:
             ]
             body_text = "\n".join(body_lines)
 
+        elif event_type == "poweron_triggered":
+            subject = f"[{'SIMULAÇÃO' if dry_run else 'RELIGAMENTO'}] Início de Religamento Automático: {plan_name}"
+            body_lines = [
+                f"⚡ *ENGING UPS - INÍCIO DE RELIGAMENTO* ⚡",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"📌 *Plano:* {plan_name}",
+                f"⚙️ *Modo:* {mode_str}",
+                f"🕒 *Hora:* {now_str}",
+                f"🔋 *Bateria:* {batt_pct:.0f}% ({batt_mode})",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"⚡ A energia da rede elétrica AC foi restabelecida e estabilizada.",
+                f"Iniciando rotina de religamento (Wake-on-LAN para servidores físicos e inicialização de VMs)...",
+                f"",
+                f"📋 *Alvos a Religar ({len(servers)}):*"
+            ]
+            for s in servers:
+                s_name = s.get("name", "Servidor")
+                s_guests = s.get("selected_guests", [])
+                g_str = f"{len(s_guests)} VMs/CTs" if s_guests else "Comando direto"
+                wol_str = " (WoL)" if (s.get("shutdown_host") or s.get("wol_mac")) else ""
+                body_lines.append(f"  • *{s_name}*: {g_str}{wol_str}")
+            body_lines.append(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            body_lines.append("Painel: https://10.255.255.28/")
+            body_text = "\n".join(body_lines)
+
+        elif event_type == "poweron_completed":
+            subject = f"[{'SIMULAÇÃO' if dry_run else 'SUCESSO'}] Religamento Concluído: {plan_name}"
+            body_lines = [
+                f"✅ *ENGING UPS - RELIGAMENTO CONCLUÍDO* ✅",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"📌 *Plano:* {plan_name}",
+                f"⚙️ *Modo:* {mode_str}",
+                f"🕒 *Hora:* {now_str}",
+                f"🔋 *Bateria:* {batt_pct:.0f}% ({batt_mode})",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"🎉 A rotina de religamento foi concluída com sucesso.",
+                f"Servidores físicos foram acordados e as instâncias virtuais iniciadas.",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"Painel: https://10.255.255.28/"
+            ]
+            body_text = "\n".join(body_lines)
+
         else: # completed
             subject = f"[{'SIMULAÇÃO' if dry_run else 'RELATÓRIO'}] Plano de Desligamento Concluído: {plan_name}"
 
@@ -666,10 +861,30 @@ class AlertManager:
 
     def _build_alert_message(self, rule, condition_desc, nut_data):
         now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        is_conn = nut_data.get("connected", True)
         status = nut_data.get("status", {})
         batt = nut_data.get("battery", {})
         inp = nut_data.get("input", {})
         out = nut_data.get("output", {})
+
+        if not is_conn:
+            bateria_str = "Indisponível (Sem Leitura)"
+            tensao_bat_str = "Indisponível"
+            tensao_in_str = "Indisponível"
+            freq_in_str = "Indisponível"
+            tensao_out_str = "Indisponível"
+            carga_str = "Indisponível"
+            potencia_str = "Indisponível"
+            modo_str = "DESCONECTADO (FALHA DE COMUNICAÇÃO)"
+        else:
+            bateria_str = f"{batt.get('charge_pct', 0):.0f}%"
+            tensao_bat_str = f"{batt.get('voltage', 0):.1f} V"
+            tensao_in_str = f"{inp.get('voltage', 0):.1f} V"
+            freq_in_str = f"{inp.get('frequency', 0):.1f} Hz"
+            tensao_out_str = f"{out.get('voltage', 0):.1f} V"
+            carga_str = f"{out.get('load_pct', 0):.1f}%"
+            potencia_str = f"{out.get('real_power_w', 0):.0f} W"
+            modo_str = status.get("label", "NORMAL").upper()
 
         custom = rule.get("custom_message", "").strip()
         
@@ -682,14 +897,14 @@ class AlertManager:
             msg = msg.replace("{condition}", condition_desc)
             msg = msg.replace("{hora}", now_str)
             msg = msg.replace("{time}", now_str)
-            msg = msg.replace("{bateria}", f"{batt.get('charge_pct', 0):.0f}%")
-            msg = msg.replace("{tensao_bat}", f"{batt.get('voltage', 0):.1f} V")
-            msg = msg.replace("{tensao_in}", f"{inp.get('voltage', 0):.1f} V")
-            msg = msg.replace("{freq_in}", f"{inp.get('frequency', 0):.1f} Hz")
-            msg = msg.replace("{tensao_out}", f"{out.get('voltage', 0):.1f} V")
-            msg = msg.replace("{carga}", f"{out.get('load_pct', 0):.1f}%")
-            msg = msg.replace("{potencia}", f"{out.get('real_power_w', 0):.0f} W")
-            msg = msg.replace("{modo}", status.get("label", "NORMAL").upper())
+            msg = msg.replace("{bateria}", bateria_str)
+            msg = msg.replace("{tensao_bat}", tensao_bat_str)
+            msg = msg.replace("{tensao_in}", tensao_in_str)
+            msg = msg.replace("{freq_in}", freq_in_str)
+            msg = msg.replace("{tensao_out}", tensao_out_str)
+            msg = msg.replace("{carga}", carga_str)
+            msg = msg.replace("{potencia}", potencia_str)
+            msg = msg.replace("{modo}", modo_str)
             msg = msg.replace("{servidor}", "10.255.255.28 (INVT HT1106XS)")
             msg = msg.replace("{painel_url}", "https://10.255.255.28/")
             return msg
@@ -697,6 +912,23 @@ class AlertManager:
             custom_part = f"\n📝 Observação: {custom}\n"
         else:
             custom_part = ""
+
+        if not is_conn:
+            msg = (
+                f"🚨 *ALERTA ENGING UPS SYSTEM* 🚨\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📌 *Evento:* {rule['name']}\n"
+                f"⚠️ *Detalhe:* {condition_desc}\n"
+                f"{custom_part}"
+                f"🕒 *Hora:* {now_str}\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🔌 *Estado:* DESCONECTADO (Sem Telemetria)\n"
+                f"🖥️ *Servidor:* 10.255.255.28 (INVT HT1106XS)\n"
+                f"🛠️ *Ação Necessária:* Verificar cabo USB/Serial (/dev/ups-usb) e o driver da UPS.\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"Painel: https://10.255.255.28/"
+            )
+            return msg
 
         msg = (
             f"🚨 *ALERTA ENGING UPS SYSTEM* 🚨\n"
@@ -706,10 +938,10 @@ class AlertManager:
             f"{custom_part}"
             f"🕒 *Hora:* {now_str}\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"🔋 *Bateria:* {batt.get('charge_pct', 0):.0f}% ({batt.get('voltage', 0):.1f} V)\n"
-            f"⚡ *Entrada AC:* {inp.get('voltage', 0):.1f} V ({inp.get('frequency', 0):.1f} Hz)\n"
-            f"🔌 *Saída UPS:* {out.get('voltage', 0):.1f} V | Carga: {out.get('load_pct', 0):.1f}% ({out.get('real_power_w', 0):.0f} W)\n"
-            f"📊 *Modo:* {status.get('label', 'NORMAL').upper()}\n"
+            f"🔋 *Bateria:* {bateria_str} ({tensao_bat_str})\n"
+            f"⚡ *Entrada AC:* {tensao_in_str} ({freq_in_str})\n"
+            f"🔌 *Saída UPS:* {tensao_out_str} | Carga: {carga_str} ({potencia_str})\n"
+            f"📊 *Modo:* {modo_str}\n"
             f"🖥️ *Servidor:* 10.255.255.28 (INVT HT1106XS)\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"Painel: https://10.255.255.28/"
@@ -952,6 +1184,44 @@ class AlertManager:
 
         format_mode = (teams_cfg.get("payload_format") if teams_cfg else "adaptive_card") or "adaptive_card"
 
+        is_conn = nut_data.get("connected", True) if nut_data else True
+        if not is_conn:
+            teams_facts = [
+                {"title": "📌 Evento:", "value": str(rule_name)},
+                {"title": "⚠️ Detalhe:", "value": str(condition_desc or "Perda de comunicação com a UPS")},
+                {"title": "🔌 Conexão:", "value": "❌ DESCONECTADO (Sem Leitura)"},
+                {"title": "🖥️ Servidor:", "value": "10.255.255.28 (INVT HT1106XS)"},
+                {"title": "🕒 Data/Hora:", "value": now_str},
+                {"title": "🛠️ Ação:", "value": "Verificar cabo USB/Serial (/dev/ups-usb) e serviço nut-driver@ups."}
+            ]
+            teams_card_facts = [
+                {"name": "Evento:", "value": str(rule_name)},
+                {"name": "Detalhe:", "value": str(condition_desc or "Perda de comunicação com a UPS")},
+                {"name": "Conexão:", "value": "❌ DESCONECTADO (Sem Leitura)"},
+                {"name": "Servidor:", "value": "10.255.255.28 (INVT HT1106XS)"},
+                {"name": "Ação:", "value": "Verificar cabo USB/Serial e serviço do driver"}
+            ]
+        else:
+            teams_facts = [
+                {"title": "📌 Evento:", "value": str(rule_name)},
+                {"title": "⚠️ Detalhe:", "value": str(condition_desc or "Notificação do Sistema")},
+                {"title": "🔋 Bateria:", "value": f"{batt.get('charge_pct', 0):.0f}% ({batt.get('voltage', 0):.1f} V)"},
+                {"title": "⚡ Entrada AC:", "value": f"{inp.get('voltage', 0):.1f} V ({inp.get('frequency', 0):.1f} Hz)"},
+                {"title": "🔌 Saída UPS:", "value": f"{out.get('voltage', 0):.1f} V | Carga: {out.get('load_pct', 0):.1f}% ({out.get('real_power_w', 0):.0f} W)"},
+                {"title": "📊 Estado:", "value": str(status.get('label', 'NORMAL')).upper()},
+                {"title": "🖥️ Servidor:", "value": "10.255.255.28 (INVT HT1106XS)"},
+                {"title": "🕒 Data/Hora:", "value": now_str}
+            ]
+            teams_card_facts = [
+                {"name": "Evento:", "value": str(rule_name)},
+                {"name": "Detalhe:", "value": str(condition_desc or "Notificação do Sistema")},
+                {"name": "Bateria:", "value": f"{batt.get('charge_pct', 0):.0f}% ({batt.get('voltage', 0):.1f} V)"},
+                {"name": "Entrada AC:", "value": f"{inp.get('voltage', 0):.1f} V ({inp.get('frequency', 0):.1f} Hz)"},
+                {"name": "Saída UPS:", "value": f"{out.get('voltage', 0):.1f} V | Carga: {out.get('load_pct', 0):.1f}% ({out.get('real_power_w', 0):.0f} W)"},
+                {"name": "Estado:", "value": str(status.get('label', 'NORMAL')).upper()},
+                {"name": "Servidor:", "value": "10.255.255.28 (INVT HT1106XS)"}
+            ]
+
         # 1. Payload Nativo AdaptiveCard 1.4 (Padrão Oficial do Power Automate / Workflows do Teams)
         adaptive_card = {
             "type": "AdaptiveCard",
@@ -966,7 +1236,7 @@ class AlertManager:
                             "text": f"🚨 [ALERTA ENGING UPS] {rule_name}",
                             "weight": "Bolder",
                             "size": "Medium",
-                            "color": "Attention" if ("Crítica" in rule_name or "Falta" in rule_name or "Sobrecarga" in rule_name) else "Default",
+                            "color": "Attention" if ("Crítica" in rule_name or "Falta" in rule_name or "Sobrecarga" in rule_name or "Desconectada" in rule_name) else "Default",
                             "wrap": True
                         },
                         {
@@ -979,16 +1249,7 @@ class AlertManager:
                 },
                 {
                     "type": "FactSet",
-                    "facts": [
-                        {"title": "📌 Evento:", "value": str(rule_name)},
-                        {"title": "⚠️ Detalhe:", "value": str(condition_desc or "Notificação do Sistema")},
-                        {"title": "🔋 Bateria:", "value": f"{batt.get('charge_pct', 0):.0f}% ({batt.get('voltage', 0):.1f} V)"},
-                        {"title": "⚡ Entrada AC:", "value": f"{inp.get('voltage', 0):.1f} V ({inp.get('frequency', 0):.1f} Hz)"},
-                        {"title": "🔌 Saída UPS:", "value": f"{out.get('voltage', 0):.1f} V | Carga: {out.get('load_pct', 0):.1f}% ({out.get('real_power_w', 0):.0f} W)"},
-                        {"title": "📊 Estado:", "value": str(status.get('label', 'NORMAL')).upper()},
-                        {"title": "🖥️ Servidor:", "value": "10.255.255.28 (INVT HT1106XS)"},
-                        {"title": "🕒 Data/Hora:", "value": now_str}
-                    ]
+                    "facts": teams_facts
                 }
             ],
             "actions": [
@@ -1011,15 +1272,7 @@ class AlertManager:
             "sections": [{
                 "activityTitle": "Enging UPS System • INVT HT1106XS",
                 "activitySubtitle": f"Data/Hora: {now_str}",
-                "facts": [
-                    {"name": "Evento:", "value": str(rule_name)},
-                    {"name": "Detalhe:", "value": str(condition_desc or "Notificação do Sistema")},
-                    {"name": "Bateria:", "value": f"{batt.get('charge_pct', 0):.0f}% ({batt.get('voltage', 0):.1f} V)"},
-                    {"name": "Entrada AC:", "value": f"{inp.get('voltage', 0):.1f} V ({inp.get('frequency', 0):.1f} Hz)"},
-                    {"name": "Saída UPS:", "value": f"{out.get('voltage', 0):.1f} V | Carga: {out.get('load_pct', 0):.1f}% ({out.get('real_power_w', 0):.0f} W)"},
-                    {"name": "Estado:", "value": str(status.get('label', 'NORMAL')).upper()},
-                    {"name": "Servidor:", "value": "10.255.255.28 (INVT HT1106XS)"}
-                ]
+                "facts": teams_card_facts
             }],
             "potentialAction": [{
                 "@type": "OpenUri",

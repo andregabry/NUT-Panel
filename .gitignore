@@ -59,3 +59,12 @@ Thumbs.db
 
 alerts_data.json
 connections_data.json
+ 
+# SQLite database and runtime cache
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+guests_cache.json
+scratch/

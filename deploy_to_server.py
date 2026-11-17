@@ -39,6 +39,7 @@ def deploy():
     
     files_to_upload = [
         ("config.py", f"{REMOTE_DIR}/config.py"),
+        ("db.py", f"{REMOTE_DIR}/db.py"),
         ("app.py", f"{REMOTE_DIR}/app.py"),
         ("auth_manager.py", f"{REMOTE_DIR}/auth_manager.py"),
         ("alert_manager.py", f"{REMOTE_DIR}/alert_manager.py"),

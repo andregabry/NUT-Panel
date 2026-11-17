@@ -5,12 +5,16 @@ import uuid
 import logging
 import threading
 import subprocess
+import socket
+import re
 from typing import Dict, Any, List, Optional
 import requests
 try:
     import paramiko
 except ImportError:
     paramiko = None
+
+from db import db
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +28,7 @@ class ShutdownManager:
         self.connections_manager = None
         self.alert_manager = None
         self.latest_nut_data = {}
+        self.online_stable_since = None
         self._load_data()
 
     def _get_default_data(self) -> Dict[str, Any]:
@@ -148,20 +153,34 @@ class ShutdownManager:
 
     def _load_data(self) -> None:
         with self.lock:
+            try:
+                db_plans = db.get_plans()
+                if db_plans:
+                    db_logs = db.get_shutdown_logs(limit=150)
+                    self.data = {
+                        "plans": db_plans,
+                        "logs": db_logs
+                    }
+                    logger.info(f"Planos de desligamento carregados do SQLite: {len(db_plans)} planos.")
+                    return
+            except Exception as e:
+                logger.warning(f"Erro ao ler planos do SQLite: {e}")
+
             if os.path.exists(self.plans_file):
                 try:
                     with open(self.plans_file, "r", encoding="utf-8") as f:
                         self.data = json.load(f)
-                        # Garante estado para todos os planos
-                        for p in self.data.get("plans", []):
-                            p.setdefault("state", {
-                                "status": "idle",
-                                "countdown_remaining": 0,
-                                "triggered_at": None,
-                                "current_server": None,
-                                "results": []
-                            })
-                        return
+                    for p in self.data.get("plans", []):
+                        p.setdefault("state", {
+                            "status": "idle",
+                            "countdown_remaining": 0,
+                            "triggered_at": None,
+                            "current_server": None,
+                            "results": []
+                        })
+                    logger.info("Planos carregados de shutdown_plans.json. A sincronizar com SQLite...")
+                    self._save_data_unlocked()
+                    return
                 except Exception as e:
                     logger.error(f"Erro ao ler {self.plans_file}: {e}")
             self.data = self._get_default_data()
@@ -169,11 +188,13 @@ class ShutdownManager:
 
     def _save_data_unlocked(self) -> None:
         try:
-            # Salva apenas dados essenciais, evitando salvar threads
+            for p in self.data.get("plans", []):
+                db.save_plan(p)
+            # Salva também ficheiro JSON para redundância
             with open(self.plans_file, "w", encoding="utf-8") as f:
                 json.dump(self.data, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            logger.error(f"Erro ao gravar {self.plans_file}: {e}")
+            logger.error(f"Erro ao gravar planos: {e}")
 
     def get_all_plans(self) -> Dict[str, Any]:
         with self.lock:
@@ -236,6 +257,10 @@ class ShutdownManager:
 
     def delete_plan(self, plan_id: str) -> bool:
         with self.lock:
+            try:
+                db.delete_plan(plan_id)
+            except Exception as e:
+                logger.warning(f"Erro ao remover plano do SQLite: {e}")
             orig_len = len(self.data.get("plans", []))
             target = next((p for p in self.data.get("plans", []) if p["id"] == plan_id), None)
             name = target.get("name") if target else plan_id
@@ -291,6 +316,10 @@ class ShutdownManager:
 
     def delete_server(self, plan_id: str, server_id: str) -> bool:
         with self.lock:
+            try:
+                db.delete_plan_server(plan_id, server_id)
+            except Exception as e:
+                logger.warning(f"Erro ao remover alvo do plano no SQLite: {e}")
             plan = next((p for p in self.data.get("plans", []) if p["id"] == plan_id), None)
             if not plan:
                 return False
@@ -302,6 +331,10 @@ class ShutdownManager:
             return False
 
     def add_log_unlocked(self, level: str, message: str, server_name: str = "Sistema", details: Any = None) -> None:
+        try:
+            db.add_shutdown_log(level, message, server_name)
+        except Exception as e:
+            logger.warning(f"Erro ao adicionar log no SQLite: {e}")
         log_entry = {
             "id": str(uuid.uuid4()),
             "timestamp": time.time(),
@@ -340,6 +373,16 @@ class ShutdownManager:
                     s["private_key"] = creds.get("private_key", "")
                 if "sudo" in creds and "sudo" not in s:
                     s["sudo"] = creds.get("sudo", False)
+                if not s.get("wol_mac"):
+                    s["wol_mac"] = creds.get("mac_address", "")
+                if not s.get("wol_broadcast"):
+                    s["wol_broadcast"] = creds.get("wol_broadcast", "255.255.255.255")
+                if not s.get("ipmi_host"):
+                    s["ipmi_host"] = creds.get("ipmi_host", "")
+                if not s.get("ipmi_user"):
+                    s["ipmi_user"] = creds.get("ipmi_user", "admin")
+                if not s.get("ipmi_pass"):
+                    s["ipmi_pass"] = creds.get("ipmi_password", "")
         return s
 
     def test_connection(self, server: Dict[str, Any]) -> Dict[str, Any]:
@@ -595,6 +638,8 @@ class ShutdownManager:
             with self.lock:
                 plan["state"]["status"] = "completed"
                 plan["state"]["current_server"] = None
+                if not dry_run:
+                    plan["state"]["shutdown_executed"] = True
                 self._save_data_unlocked()
 
             self.add_log("info", f"Plano '{plan_name}' concluído com sucesso.", server_name=plan_name)
@@ -611,8 +656,260 @@ class ShutdownManager:
         self.active_threads[plan_id] = t
         t.start()
 
+    @staticmethod
+    def send_wake_on_lan(mac_address: str, broadcast_ip: str = "255.255.255.255", port: int = 9) -> bool:
+        """Envia um Pacote Mágico Wake-on-LAN (WoL) para acordar um servidor físico."""
+        if not mac_address:
+            return False
+        clean_mac = re.sub(r'[^a-fA-F0-9]', '', mac_address)
+        if len(clean_mac) != 12:
+            raise ValueError(f"Endereço MAC inválido ({mac_address}). Deve conter 12 caracteres hexadecimais.")
+        mac_bytes = bytes.fromhex(clean_mac)
+        magic_packet = b'\xff' * 6 + mac_bytes * 16
+
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            targets = set([broadcast_ip, "255.255.255.255", "10.255.255.255", "192.168.5.255", "192.168.11.255"])
+            for b_ip in targets:
+                try:
+                    sock.sendto(magic_packet, (b_ip, port))
+                    sock.sendto(magic_packet, (b_ip, 7))
+                except Exception:
+                    pass
+        return True
+
+    @staticmethod
+    def send_ipmi_power_on(host: str, user: str = "admin", password: str = "") -> bool:
+        """Envia comando de inicialização IPMI Chassis Power On."""
+        if not host:
+            return False
+        cmd = f"ipmitool -I lanplus -H {host} -U '{user}' -P '{password}' chassis power on"
+        try:
+            res = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=8)
+            return res.returncode == 0
+        except Exception:
+            return False
+
+    def _wait_for_host_online(self, host: str, port: int = 22, timeout_sec: int = 120) -> bool:
+        """Sonda periodicamente um host via socket TCP até que ele esteja online e aceitando conexões."""
+        start = time.time()
+        while time.time() - start < timeout_sec:
+            try:
+                with socket.create_connection((host, port), timeout=2.0):
+                    return True
+            except (socket.timeout, ConnectionRefusedError, OSError):
+                time.sleep(4)
+        return False
+
+    def execute_poweron_server(self, server: Dict[str, Any], plan_name: str = "", dry_run: bool = False) -> Dict[str, Any]:
+        """Executa a rotina de religamento (Wake-on-LAN para o nó físico e/ou arranque das VMs/CTs)."""
+        server = self._resolve_server_credentials(server)
+        name = server.get("name", "Servidor")
+        host = server.get("host", "").strip()
+        port = int(server.get("port", 22))
+        shutdown_host = server.get("shutdown_host", False)
+        wol_mac = server.get("wol_mac", "").strip()
+        wol_broadcast = server.get("wol_broadcast", "255.255.255.255").strip() or "255.255.255.255"
+        ipmi_host = server.get("ipmi_host", "").strip()
+        selected_guests = server.get("selected_guests", [])
+
+        results = {
+            "server": name,
+            "host_awakened": False,
+            "guests_started": [],
+            "errors": []
+        }
+
+        # 1. Acordar o Servidor Físico (se estava marcado para desligar host ou tem MAC WoL)
+        if shutdown_host or wol_mac:
+            if dry_run:
+                msg = f"[DRY-RUN] Simulação: Enviaria pacote Wake-on-LAN para MAC '{wol_mac}'" + (f" e IPMI para '{ipmi_host}'" if ipmi_host else "")
+                self.add_log("info", msg, server_name=f"{plan_name} / {name}")
+                results["host_awakened"] = True
+            else:
+                if wol_mac:
+                    try:
+                        self.send_wake_on_lan(wol_mac, broadcast_ip=wol_broadcast)
+                        self.add_log("warning", f"Pacote Mágico Wake-on-LAN enviado para {name} (MAC: {wol_mac}, Broadcast: {wol_broadcast}).", server_name=f"{plan_name} / {name}")
+                        results["host_awakened"] = True
+                    except Exception as e:
+                        err_msg = f"Falha ao enviar WoL para {name} ({wol_mac}): {e}"
+                        self.add_log("error", err_msg, server_name=f"{plan_name} / {name}")
+                        results["errors"].append(err_msg)
+
+                if ipmi_host:
+                    try:
+                        ipmi_ok = self.send_ipmi_power_on(ipmi_host, server.get("ipmi_user", "admin"), server.get("ipmi_pass", ""))
+                        if ipmi_ok:
+                            self.add_log("warning", f"Comando IPMI Power On enviado para {name} ({ipmi_host}).", server_name=f"{plan_name} / {name}")
+                            results["host_awakened"] = True
+                    except Exception as e:
+                        err_msg = f"Falha ao acionar IPMI em {name} ({ipmi_host}): {e}"
+                        self.add_log("error", err_msg, server_name=f"{plan_name} / {name}")
+                        results["errors"].append(err_msg)
+
+                # Aguarda o boot do host físico (health-check via porta 22) se ele tiver sido acordado
+                if host:
+                    self.add_log("info", f"Aguardando host {name} ({host}) concluir o arranque do SO (espera até 120s)...", server_name=f"{plan_name} / {name}")
+                    booted = self._wait_for_host_online(host, port, timeout_sec=120)
+                    if booted:
+                        self.add_log("info", f"Host {name} ({host}) respondeu na rede com sucesso!", server_name=f"{plan_name} / {name}")
+                    else:
+                        err_msg = f"Aviso: Host {name} ({host}) não respondeu via SSH dentro de 120 segundos."
+                        self.add_log("error", err_msg, server_name=f"{plan_name} / {name}")
+                        results["errors"].append(err_msg)
+
+        # 2. Religar VMs e Containers
+        if selected_guests:
+            if dry_run:
+                for g in selected_guests:
+                    g_type = (g.get("type") or "qemu").upper()
+                    g_name = g.get("name", g.get("id"))
+                    msg = f"[DRY-RUN] Simulação: Enviaria comando de arranque para {g_type} [{g.get('id')}] '{g_name}'"
+                    self.add_log("info", msg, server_name=f"{plan_name} / {name}")
+                    results["guests_started"].append(f"{g_type}:{g.get('id')}")
+            else:
+                if not paramiko:
+                    err = "Módulo paramiko não disponível para SSH"
+                    self.add_log("error", err, server_name=f"{plan_name} / {name}")
+                    results["errors"].append(err)
+                    return {"success": False, "message": err, "results": results}
+
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                try:
+                    username = server.get("username", "root")
+                    password = server.get("password") or None
+                    connect_kwargs = {"hostname": host, "port": port, "username": username, "timeout": 15}
+                    if server.get("private_key"):
+                        import io
+                        try:
+                            connect_kwargs["pkey"] = paramiko.RSAKey.from_private_key(io.StringIO(server["private_key"]))
+                        except Exception:
+                            connect_kwargs["pkey"] = paramiko.Ed25519Key.from_private_key(io.StringIO(server["private_key"]))
+                    elif password:
+                        connect_kwargs["password"] = password
+
+                    ssh.connect(**connect_kwargs)
+
+                    for g in selected_guests:
+                        gid = g.get("id")
+                        gtype = g.get("type") or "qemu"
+                        gname = g.get("name", gid)
+
+                        if gtype == "lxc":
+                            start_cmd = f"pct start {gid}"
+                        elif gtype == "vmware_vm":
+                            start_cmd = f"vim-cmd vmsvc/power.on {gid}"
+                        else: # qemu
+                            start_cmd = f"qm start {gid}"
+
+                        try:
+                            stdin, stdout, stderr = ssh.exec_command(start_cmd, timeout=12)
+                            out = stdout.read().decode('utf-8', errors='ignore').strip()
+                            self.add_log("info", f"Instância {gtype.upper()} [{gid}] '{gname}' iniciada com sucesso.", server_name=f"{plan_name} / {name}")
+                            results["guests_started"].append(f"{gtype}:{gid}")
+                        except Exception as ex_g:
+                            err_g = f"Erro ao iniciar {gtype.upper()} [{gid}] em {name}: {ex_g}"
+                            self.add_log("error", err_g, server_name=f"{plan_name} / {name}")
+                            results["errors"].append(err_g)
+
+                        # Pequeno intervalo entre starts para evitar pico de IOPS
+                        time.sleep(3)
+
+                    ssh.close()
+                except Exception as e:
+                    err_msg = f"Falha ao conectar via SSH a {name} ({host}) para religar VMs: {e}"
+                    self.add_log("error", err_msg, server_name=f"{plan_name} / {name}")
+                    results["errors"].append(err_msg)
+
+        # 3. Comando customizado de religamento (se houver)
+        custom_poweron = server.get("custom_poweron_cmd", "").strip()
+        if custom_poweron:
+            if dry_run:
+                self.add_log("info", f"[DRY-RUN] Simulação: Executaria comando de religamento customizado: '{custom_poweron}'", server_name=f"{plan_name} / {name}")
+            else:
+                try:
+                    ssh = paramiko.SSHClient()
+                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                    ssh.connect(hostname=host, port=port, username=server.get("username", "root"), password=server.get("password"), timeout=10)
+                    ssh.exec_command(custom_poweron, timeout=10)
+                    ssh.close()
+                    self.add_log("info", f"Comando customizado de religamento enviado para {name}: '{custom_poweron}'", server_name=f"{plan_name} / {name}")
+                except Exception as e:
+                    results["errors"].append(str(e))
+
+        is_success = len(results["errors"]) == 0
+        return {"success": is_success, "message": f"Religamento de {name} finalizado.", "results": results}
+
+    def run_poweron_plan_async(self, plan_id: str, dry_run: bool = False) -> None:
+        """Executa a rotina de religamento (Wake-on-LAN + Inicialização de VMs) de forma assíncrona."""
+        with self.lock:
+            plan = next((p for p in self.data.get("plans", []) if p["id"] == plan_id), None)
+            if not plan:
+                return
+
+            if plan["state"].get("poweron_running"):
+                return
+
+            plan["state"]["poweron_running"] = True
+            plan["state"]["poweron_status"] = "running"
+            plan["state"]["poweron_started_at"] = time.time()
+            plan["state"]["poweron_results"] = []
+            plan_name = plan.get("name", "Plano")
+            servers = [s for s in plan.get("servers", []) if s.get("enabled", True)]
+
+        self.add_log("warning", f"⚡ Disparando religamento de {len(servers)} alvos do plano '{plan_name}' (Modo: {'Simulação' if dry_run else 'Real'}).", server_name=plan_name)
+
+        if self.alert_manager:
+            try:
+                self.alert_manager.send_shutdown_plan_notification(
+                    plan, "poweron_triggered", dry_run=dry_run, nut_data=self.latest_nut_data
+                )
+            except Exception as e:
+                logger.error(f"Erro ao disparar alerta de início de religamento: {e}")
+
+        def worker():
+            results = []
+            for s in servers:
+                with self.lock:
+                    if plan["state"].get("poweron_cancelled"):
+                        break
+                    plan["state"]["current_server"] = s.get("name")
+
+                res = self.execute_poweron_server(s, plan_name=plan_name, dry_run=dry_run)
+                results.append(res)
+                with self.lock:
+                    plan["state"]["poweron_results"].append(res)
+
+            with self.lock:
+                plan["state"]["poweron_running"] = False
+                plan["state"]["poweron_status"] = "completed"
+                plan["state"]["current_server"] = None
+                if not dry_run:
+                    plan["state"]["shutdown_executed"] = False
+                    plan["state"]["status"] = "idle"
+                self._save_data_unlocked()
+
+            self.add_log("info", f"✅ Rotina de religamento do plano '{plan_name}' finalizada com sucesso.", server_name=plan_name)
+
+            if self.alert_manager:
+                try:
+                    self.alert_manager.send_shutdown_plan_notification(
+                        plan, "poweron_completed", results=results, dry_run=dry_run, nut_data=self.latest_nut_data
+                    )
+                except Exception as e:
+                    logger.error(f"Erro ao disparar alerta de conclusão de religamento: {e}")
+
+        t = threading.Thread(target=worker, daemon=True)
+        self.active_threads[f"poweron_{plan_id}"] = t
+        t.start()
+
     def check_nut_triggers(self, nut_data: Dict[str, Any]) -> None:
-        """Verifica os gatilhos de bateria individualmente para cada plano configurado."""
+        """Verifica gatilhos de desligamento E rotinas automáticas de religamento com histerese."""
+        if not nut_data or not nut_data.get("connected"):
+            return
+
         self.latest_nut_data = nut_data
         status = nut_data.get("status", {})
         battery = nut_data.get("battery", {})
@@ -623,10 +920,24 @@ class ShutdownManager:
             is_on_battery = True
 
         battery_pct = battery.get("charge_pct", 100.0)
-        is_online = status.get("is_online", True)
+        is_online = status.get("is_online", True) and not is_on_battery
+
+        now = time.time()
+
+        # 1. Gestão do Temporizador de Estabilidade da Rede Elétrica AC
+        if is_online:
+            if not getattr(self, "online_stable_since", None):
+                self.online_stable_since = now
+        else:
+            self.online_stable_since = None
+
+        stable_seconds = (now - self.online_stable_since) if self.online_stable_since else 0
+
+        # 2. Verificação de Planos para Desligamento ou Religamento
+        plans_to_shutdown = []
+        plans_to_poweron = []
 
         with self.lock:
-            plans_to_run = []
             for plan in self.data.get("plans", []):
                 if not plan.get("enabled", True):
                     continue
@@ -634,13 +945,29 @@ class ShutdownManager:
                 state = plan.get("state", {})
                 current_status = state.get("status", "idle")
 
-                # Se a energia voltou e o plano estava completed ou cancelled, reseta para idle
-                if is_online and current_status in ("completed", "cancelled"):
-                    state["status"] = "idle"
-                    state["results"] = []
-                    continue
+                # ========================================================
+                # ROTINA A: AUTO-RELIGAMENTO (Quando a energia AC volta)
+                # ========================================================
+                auto_poweron = plan.get("auto_poweron_enabled", True)
+                shutdown_was_run = state.get("shutdown_executed", False)
+                poweron_running = state.get("poweron_running", False)
 
-                # Se já está em contagem, execução ou já completou neste ciclo, pula
+                if is_online and auto_poweron and shutdown_was_run and not poweron_running:
+                    min_stable = plan.get("poweron_min_stable_sec", 120)
+                    min_batt = plan.get("poweron_min_battery_pct", 35.0)
+
+                    # Verifica se a rede já está estável pelo tempo configurado E a bateria já atingiu a carga mínima segura
+                    if stable_seconds >= min_stable and battery_pct >= min_batt:
+                        plans_to_poweron.append(plan["id"])
+                    else:
+                        state["poweron_waiting_reason"] = (
+                            f"Aguardando rede estável ({int(stable_seconds)}s/{min_stable}s) "
+                            f"ou recarga mínima ({battery_pct:.0f}%/{min_batt:.0f}%)"
+                        )
+
+                # ========================================================
+                # ROTINA B: GATILHOS DE DESLIGAMENTO (Quando em bateria)
+                # ========================================================
                 if current_status in ("countdown", "running", "completed"):
                     continue
 
@@ -656,8 +983,17 @@ class ShutdownManager:
                         condition_met = True
 
                 if condition_met:
-                    plans_to_run.append((plan["id"], plan["name"], trigger_pct))
+                    plans_to_shutdown.append((plan["id"], plan["name"], trigger_pct))
 
-        for plan_id, plan_name, trigger_pct in plans_to_run:
+        # Executa planos de desligamento
+        for plan_id, plan_name, trigger_pct in plans_to_shutdown:
             logger.warning(f"🚨 TRIGGER ATIVADO PARA O PLANO '{plan_name}'! Bateria: {battery_pct}% ≤ {trigger_pct}% (Em Bateria: {is_on_battery})")
             self.run_plan_async(plan_id, dry_run=False)
+
+        # Executa planos de religamento
+        for plan_id in plans_to_poweron:
+            with self.lock:
+                plan = next((p for p in self.data.get("plans", []) if p["id"] == plan_id), None)
+                pname = plan.get("name") if plan else plan_id
+            logger.info(f"⚡ DISPARANDO AUTO-RELIGAMENTO PARA O PLANO '{pname}'! (Bateria: {battery_pct}%, Rede estável por {int(stable_seconds)}s)")
+            self.run_poweron_plan_async(plan_id, dry_run=False)

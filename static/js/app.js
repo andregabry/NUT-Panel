@@ -1040,6 +1040,7 @@ function renderPlansTabsAndPanel() {
                         ${qCount > 0 ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-mono text-[10px] font-bold"><i data-lucide="box" class="w-3 h-3"></i> ${qCount} VMs</span>` : ''}
                         ${lCount > 0 ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 font-mono text-[10px] font-bold"><i data-lucide="layers" class="w-3 h-3"></i> ${lCount} CTs</span>` : ''}
                         ${s.shutdown_host ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-mono text-[10px] font-bold"><i data-lucide="power" class="w-3 h-3"></i> + Host</span>` : ''}
+                        ${(s.shutdown_host || s.wol_mac) ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono text-[10px] font-bold" title="Wake-on-LAN: ${escapeHtml(s.wol_mac || 'Automático')}"><i data-lucide="zap" class="w-3 h-3 text-emerald-600"></i> WoL</span>` : ''}
                     </div>
                 `;
             }
@@ -1058,6 +1059,9 @@ function renderPlansTabsAndPanel() {
                     <td class="p-3.5 text-right space-x-1.5 whitespace-nowrap">
                         <button onclick="testServerConnection('${activePlan.id}', '${s.id}')" title="Testar Conexão" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-enging-navy border border-slate-200 transition">
                             <i data-lucide="zap" class="w-3.5 h-3.5 text-enging-orange"></i>
+                        </button>
+                        <button onclick="runServerPoweron('${activePlan.id}', '${s.id}', '${escapeHtml(s.name)}')" title="Religar este Alvo (WoL / Iniciar VMs)" class="p-2 rounded-xl bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200 transition">
+                            <i data-lucide="rotate-cw" class="w-3.5 h-3.5 text-emerald-600"></i>
                         </button>
                         <button onclick="manualShutdownSingle('${activePlan.id}', '${s.id}')" title="Desligar Individual" class="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-700 border border-slate-200 transition">
                             <i data-lucide="power" class="w-3.5 h-3.5"></i>
@@ -1096,8 +1100,11 @@ function renderPlansTabsAndPanel() {
                     <button onclick="runPlanDryRun('${activePlan.id}')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-enging-navy border border-slate-200 font-bold text-xs transition flex items-center gap-1.5">
                         <i data-lucide="play" class="w-4 h-4 text-emerald-600"></i> Simular (Dry-Run)
                     </button>
+                    <button onclick="runPlanPoweron('${activePlan.id}', '${escapeHtml(activePlan.name)}')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-emerald-50 text-emerald-700 hover:text-emerald-800 border border-slate-200 font-bold text-xs transition flex items-center gap-1.5 shadow-xs" title="Religar Servidores e VMs deste Plano (WoL/IPMI e Start)">
+                        <i data-lucide="rotate-cw" class="w-4 h-4 text-emerald-600"></i> Religar Alvos
+                    </button>
                     <button onclick="runPlanNow('${activePlan.id}', '${activePlan.name}')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-slate-200 font-bold text-xs transition flex items-center gap-1.5">
-                        <i data-lucide="power" class="w-4 h-4"></i> Executar Agora
+                        <i data-lucide="power" class="w-4 h-4"></i> Executar Desligamento
                     </button>
                     <button onclick="testPlanNotification('${activePlan.id}', '${escapeHtml(activePlan.name)}')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-enging-navy border border-slate-200 font-bold text-xs transition flex items-center gap-1.5" title="Testar Envio de Notificação aos Contatos">
                         <i data-lucide="bell" class="w-4 h-4 text-amber-500"></i> Testar Alerta
@@ -1112,7 +1119,7 @@ function renderPlansTabsAndPanel() {
             </div>
 
             <!-- Plan Quick Parameters Bar -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 p-4 bg-slate-50/80 border-b border-slate-100 text-xs">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 p-4 bg-slate-50/80 border-b border-slate-100 text-xs">
                 <div class="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
                     <div class="p-2.5 rounded-xl bg-orange-50 text-enging-orange">
                         <i data-lucide="zap" class="w-4 h-4"></i>
@@ -1144,15 +1151,25 @@ function renderPlansTabsAndPanel() {
                 </div>
 
                 <div class="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
+                    <div class="p-2.5 rounded-xl ${activePlan.auto_poweron_enabled !== false ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}">
+                        <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block uppercase font-bold">Auto-Religamento</span>
+                        <strong class="text-xs font-bold ${activePlan.auto_poweron_enabled !== false ? 'text-emerald-700' : 'text-slate-400'}">
+                            ${activePlan.auto_poweron_enabled !== false ? `≥ ${activePlan.poweron_min_battery_pct || (activePlan.trigger_battery_pct > 30 ? 85 : 35)}% (${activePlan.poweron_min_stable_sec || 120}s)` : 'Desativado'}
+                        </strong>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
                     <div class="p-2.5 rounded-xl ${activePlan.notifications && activePlan.notifications.enabled ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-400'}">
                         <i data-lucide="${activePlan.notifications && activePlan.notifications.enabled ? 'bell-ring' : 'bell-off'}" class="w-4 h-4"></i>
                     </div>
                     <div>
-                        <span class="text-[10px] text-slate-400 block uppercase font-bold">Alertas aos Contatos</span>
+                        <span class="text-[10px] text-slate-400 block uppercase font-bold">Alertas</span>
                         <strong class="text-xs font-bold ${activePlan.notifications && activePlan.notifications.enabled ? 'text-amber-700' : 'text-slate-400'}">
-                            ${activePlan.notifications && activePlan.notifications.enabled 
-                                ? `${(activePlan.notifications.recipient_ids && activePlan.notifications.recipient_ids.length > 0) ? activePlan.notifications.recipient_ids.length + ' contato(s)' : 'Todos os contatos'}`
-                                : 'Desativados'}
+                            ${activePlan.notifications && activePlan.notifications.enabled ? 'Ativos' : 'Desativados'}
                         </strong>
                     </div>
                 </div>
@@ -1393,6 +1410,40 @@ async function openCreatePlanModal(planId = null) {
                     </div>
                 </div>
 
+                <!-- 4. SEÇÃO DE AUTO-RELIGAMENTO & RECUPERAÇÃO -->
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label for="swal-plan-poweron-enabled" class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="swal-plan-poweron-enabled" onchange="window.togglePlanPoweronBox()" ${p.auto_poweron_enabled !== false ? 'checked' : ''} class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300">
+                            <span class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <i data-lucide="zap" class="w-4 h-4 text-emerald-600"></i>
+                                <span>Auto-Religar Servidores e VMs ao Retornar Energia AC</span>
+                            </span>
+                        </label>
+                        <span class="text-[10px] text-slate-400 font-mono">Recuperação</span>
+                    </div>
+
+                    <div id="swal-plan-poweron-box" class="space-y-3 pt-2 border-t border-slate-200/60 ${p.auto_poweron_enabled !== false ? '' : 'hidden'}">
+                        <div class="grid grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-emerald-800 uppercase mb-1">Bateria Mínima (%)</label>
+                                <input id="swal-plan-poweron-batt" type="number" min="5" max="100" class="w-full px-3 py-1.5 text-xs font-mono rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-emerald-500" value="${p.poweron_min_battery_pct || (p.trigger_battery_pct > 30 ? 85 : 35)}">
+                                <p class="text-[10px] text-slate-400 mt-0.5">Religa com carga ≥ X%</p>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Rede Estável (s)</label>
+                                <input id="swal-plan-poweron-stable" type="number" min="10" max="600" class="w-full px-3 py-1.5 text-xs font-mono rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-emerald-500" value="${p.poweron_min_stable_sec || 120}">
+                                <p class="text-[10px] text-slate-400 mt-0.5">Tempo contínuo em rede AC</p>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Delay entre VMs (s)</label>
+                                <input id="swal-plan-poweron-delay" type="number" min="0" max="60" class="w-full px-3 py-1.5 text-xs font-mono rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-emerald-500" value="${p.poweron_delay_sec || 5}">
+                                <p class="text-[10px] text-slate-400 mt-0.5">Evita pico de I/O de disco</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         `,
         showCancelButton: true,
@@ -1405,6 +1456,15 @@ async function openCreatePlanModal(planId = null) {
             window.togglePlanNotifBox = () => {
                 const chk = document.getElementById('swal-plan-notif-enabled');
                 const box = document.getElementById('swal-plan-notif-box');
+                if (chk && box) {
+                    if (chk.checked) box.classList.remove('hidden');
+                    else box.classList.add('hidden');
+                }
+            };
+
+            window.togglePlanPoweronBox = () => {
+                const chk = document.getElementById('swal-plan-poweron-enabled');
+                const box = document.getElementById('swal-plan-poweron-box');
                 if (chk && box) {
                     if (chk.checked) box.classList.remove('hidden');
                     else box.classList.add('hidden');
@@ -1435,6 +1495,11 @@ async function openCreatePlanModal(planId = null) {
             const recIds = Array.from(document.querySelectorAll('.swal-plan-rec-chk:checked')).map(cb => cb.value);
             const channels = Array.from(document.querySelectorAll('.swal-plan-channel-chk:checked')).map(cb => cb.value);
 
+            const autoPoweronEnabled = document.getElementById('swal-plan-poweron-enabled')?.checked || false;
+            const poweronMinBattery = parseFloat(document.getElementById('swal-plan-poweron-batt')?.value) || 35;
+            const poweronMinStable = parseInt(document.getElementById('swal-plan-poweron-stable')?.value) || 120;
+            const poweronDelaySec = parseInt(document.getElementById('swal-plan-poweron-delay')?.value) || 5;
+
             return {
                 id: p.id || undefined,
                 name,
@@ -1443,6 +1508,10 @@ async function openCreatePlanModal(planId = null) {
                 grace_period_sec,
                 require_on_battery,
                 enabled,
+                auto_poweron_enabled: autoPoweronEnabled,
+                poweron_min_battery_pct: poweronMinBattery,
+                poweron_min_stable_sec: poweronMinStable,
+                poweron_delay_sec: poweronDelaySec,
                 notifications: {
                     enabled: notifEnabled,
                     notify_on_trigger: notifyTrigger,
@@ -1597,7 +1666,12 @@ async function openAddServerModal(planId, serverId = null) {
         delay_sec: 0,
         enabled: true,
         webhook_url: '',
-        webhook_method: 'POST'
+        webhook_method: 'POST',
+        wol_mac: '',
+        wol_broadcast: '255.255.255.255',
+        ipmi_host: '',
+        ipmi_user: 'admin',
+        ipmi_pass: ''
     };
 
     if (!s) return;
@@ -1743,10 +1817,54 @@ async function openAddServerModal(planId, serverId = null) {
                     <!-- Checkbox: Desligar também o Host físico -->
                     <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
                         <label for="swal-srv-shutdown-host" class="flex items-center gap-2 cursor-pointer select-none">
-                            <input type="checkbox" id="swal-srv-shutdown-host" onchange="window.updateAutoCommand()" ${s.shutdown_host ? 'checked' : ''} class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300">
+                            <input type="checkbox" id="swal-srv-shutdown-host" onchange="window.updateAutoCommand(); window.toggleWolBox();" ${s.shutdown_host ? 'checked' : ''} class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300">
                             <span class="font-bold text-slate-800 text-xs">Desligar também o Hipervisor físico após as VMs/CTs</span>
                         </label>
                         <span class="text-[10px] text-slate-400 font-mono">(poweroff / shutdown)</span>
+                    </div>
+
+                    <!-- Parâmetros de Religamento Físico Remoto (Wake-on-LAN & IPMI) -->
+                    <div id="swal-srv-wol-section" class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 ${s.shutdown_host || s.wol_mac ? '' : 'hidden'}">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <i data-lucide="zap" class="w-4 h-4 text-emerald-600"></i>
+                                <span>Recuperação Remota (Wake-on-LAN & IPMI)</span>
+                            </span>
+                            <span class="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-bold">Auto-Religamento</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2.5">
+                            <div class="col-span-2">
+                                <label class="block text-[10px] font-bold text-slate-700 uppercase mb-0.5">Endereço MAC Físico (WoL)</label>
+                                <input id="swal-srv-wol-mac" class="w-full px-2.5 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-emerald-500" placeholder="00:25:90:38:2c:ca" value="${escapeHtml(s.wol_mac || '')}">
+                                <p class="text-[9px] text-slate-400 mt-0.5">Pacote Mágico WoL para religar a placa-mãe (ACPI S5)</p>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-700 uppercase mb-0.5">Broadcast IP</label>
+                                <input id="swal-srv-wol-bcast" class="w-full px-2.5 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-emerald-500" placeholder="255.255.255.255" value="${escapeHtml(s.wol_broadcast || '255.255.255.255')}">
+                                <p class="text-[9px] text-slate-400 mt-0.5">Sub-rede</p>
+                            </div>
+                        </div>
+                        <details class="group text-[11px]">
+                            <summary class="font-bold text-slate-600 cursor-pointer flex items-center gap-1 select-none">
+                                <i data-lucide="shield" class="w-3.5 h-3.5 text-slate-400"></i>
+                                <span>Controle BMC / IPMI Opcional (iLO / iDRAC / SuperMicro)</span>
+                                <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 group-open:rotate-180 transition"></i>
+                            </summary>
+                            <div class="grid grid-cols-3 gap-2 pt-2">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">IP IPMI</label>
+                                    <input id="swal-srv-ipmi-host" class="w-full px-2 py-1 text-xs rounded-lg bg-white border border-slate-200 font-mono" placeholder="192.168.5.100" value="${escapeHtml(s.ipmi_host || '')}">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Usuário</label>
+                                    <input id="swal-srv-ipmi-user" class="w-full px-2 py-1 text-xs rounded-lg bg-white border border-slate-200 font-mono" placeholder="ADMIN" value="${escapeHtml(s.ipmi_user || 'admin')}">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Senha</label>
+                                    <input id="swal-srv-ipmi-pass" type="password" class="w-full px-2 py-1 text-xs rounded-lg bg-white border border-slate-200 font-mono" placeholder="••••••••" value="${escapeHtml(s.ipmi_pass || '')}">
+                                </div>
+                            </div>
+                        </details>
                     </div>
                 </div>
 
@@ -1850,6 +1968,15 @@ async function openAddServerModal(planId, serverId = null) {
                     previouslySelectedMap.set(`${g.type || 'qemu'}:${g.id}`, true);
                 });
             }
+
+            window.toggleWolBox = () => {
+                const chk = document.getElementById('swal-srv-shutdown-host');
+                const box = document.getElementById('swal-srv-wol-section');
+                if (chk && box) {
+                    if (chk.checked) box.classList.remove('hidden');
+                    else box.classList.add('hidden');
+                }
+            };
 
             window.toggleManualMethodFields = () => {
                 const method = document.getElementById('swal-srv-method')?.value || 'ssh';
@@ -1970,6 +2097,12 @@ async function openAddServerModal(planId, serverId = null) {
             };
 
             window.onRegisteredServerChange = async (forceRefresh = false) => {
+                if (window._guestsAbortCtrl) {
+                    try { window._guestsAbortCtrl.abort(); } catch(e){}
+                }
+                window._guestsAbortCtrl = new AbortController();
+                const signal = window._guestsAbortCtrl.signal;
+
                 const regVal = document.getElementById('swal-srv-registered')?.value || '';
                 const emptyPrompt = document.getElementById('swal-guests-empty-prompt');
                 const guestsBox = document.getElementById('swal-guests-box');
@@ -2023,18 +2156,42 @@ async function openAddServerModal(planId, serverId = null) {
                     : `/api/connections/vmware/${connId}/guests${forceRefresh ? '?refresh=1' : ''}`;
 
                 let targetSrvName = 'Hipervisor';
+                let targetMac = '';
+                let targetBcast = '';
+                let targetIpmi = '';
                 if (isProxmox) {
                     const found = proxmoxServers.find(p => p.id === connId);
-                    if (found) targetSrvName = found.name;
+                    if (found) {
+                        targetSrvName = found.name;
+                        targetMac = found.mac_address || '';
+                        targetBcast = found.wol_broadcast || '';
+                        targetIpmi = found.ipmi_host || '';
+                    }
                 } else {
                     const found = vmwareServers.find(v => v.id === connId);
-                    if (found) targetSrvName = found.name;
+                    if (found) {
+                        targetSrvName = found.name;
+                        targetMac = found.mac_address || '';
+                        targetBcast = found.wol_broadcast || '';
+                        targetIpmi = found.ipmi_host || '';
+                    }
                 }
                 currentServerName = targetSrvName;
+                const macEl = document.getElementById('swal-srv-wol-mac');
+                if (macEl && !macEl.value && targetMac) macEl.value = targetMac;
+                const bcastEl = document.getElementById('swal-srv-wol-bcast');
+                if (bcastEl && (!bcastEl.value || bcastEl.value === '255.255.255.255') && targetBcast) bcastEl.value = targetBcast;
+                const ipmiEl = document.getElementById('swal-srv-ipmi-host');
+                if (ipmiEl && !ipmiEl.value && targetIpmi) ipmiEl.value = targetIpmi;
                 if (loadText) loadText.innerText = `A consultar VMs e CTs em ${targetSrvName} via SSH...`;
 
+                const fetchTimeoutId = setTimeout(() => {
+                    try { window._guestsAbortCtrl.abort(); } catch(e){}
+                }, 12000);
+
                 try {
-                    const res = await fetch(endpoint);
+                    const res = await fetch(endpoint, { signal });
+                    clearTimeout(fetchTimeoutId);
                     const data = await res.json();
                     if (loadingEl) loadingEl.classList.add('hidden');
 
@@ -2246,9 +2403,13 @@ async function openAddServerModal(planId, serverId = null) {
                     window.updateAutoCommand();
 
                 } catch (err) {
+                    if (err.name === 'AbortError') {
+                        // Requisição abortada porque o utilizador trocou de hipervisor ou atingiu timeout
+                        return;
+                    }
                     if (loadingEl) loadingEl.classList.add('hidden');
                     if (errorEl) {
-                        errorEl.innerText = 'Erro ao contactar API de conexões: ' + err;
+                        errorEl.innerText = 'Erro ao contactar API de conexões: ' + (err.message || err);
                         errorEl.classList.remove('hidden');
                     }
                 }
@@ -2357,6 +2518,11 @@ async function openAddServerModal(planId, serverId = null) {
             payload.port = targetPort;
             payload.selected_guests = selectedGuests;
             payload.shutdown_host = shutdownHost;
+            payload.wol_mac = document.getElementById('swal-srv-wol-mac')?.value.trim() || '';
+            payload.wol_broadcast = document.getElementById('swal-srv-wol-bcast')?.value.trim() || '255.255.255.255';
+            payload.ipmi_host = document.getElementById('swal-srv-ipmi-host')?.value.trim() || '';
+            payload.ipmi_user = document.getElementById('swal-srv-ipmi-user')?.value.trim() || 'admin';
+            payload.ipmi_pass = document.getElementById('swal-srv-ipmi-pass')?.value || '';
             payload.custom_command = document.getElementById('swal-srv-cmd')?.value.trim() || 'shutdown -h now';
 
             return payload;
@@ -2593,6 +2759,116 @@ async function cancelPlanExecution(planId) {
     }
 }
 
+async function runPlanPoweron(planId, planName) {
+    swalEnging.fire({
+        title: `Religar Alvos de [${planName}]?`,
+        html: `
+            <div class="text-left space-y-2 text-xs">
+                <p class="text-slate-700">Esta ação executará a rotina de recuperação e religamento dos alvos configurados:</p>
+                <ul class="list-disc list-inside space-y-1 text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    <li>Envio de <strong>Pacote Mágico Wake-on-LAN (WoL)</strong> e/ou comando IPMI aos nós físicos desligados</li>
+                    <li>Sonda e verificação de retorno de conectividade do host</li>
+                    <li>Inicialização sequencial das Máquinas Virtuais (VMs) e Containers (CTs)</li>
+                </ul>
+            </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonColor: '#059669',
+        denyButtonColor: '#223546',
+        confirmButtonText: '⚡ Sim, Religamento Real',
+        denyButtonText: 'Simulação Apenas (Dry-Run)',
+        cancelButtonText: 'Cancelar'
+    }).then(async (result) => {
+        if (result.isConfirmed || result.isDenied) {
+            const dry_run = result.isDenied;
+            swalEnging.fire({
+                title: dry_run ? 'Iniciando Simulação...' : 'Disparando Religamento...',
+                text: 'Aguarde o envio dos pacotes WoL e ordens de arranque...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            try {
+                const res = await fetch(`/api/plans/${planId}/poweron`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dry_run })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    swalEnging.fire({
+                        icon: 'success',
+                        title: dry_run ? 'Simulação de Religamento Concluída!' : 'Religamento Acionado!',
+                        text: data.message || 'Rotina de religamento disparada.',
+                        timer: 2500,
+                        showConfirmButton: false
+                    });
+                    loadPlansData();
+                } else {
+                    swalEnging.fire('Aviso', data.message || 'Falha ao acionar religamento', 'warning');
+                }
+            } catch (e) {
+                swalEnging.fire('Erro', 'Falha na comunicação com o servidor: ' + e, 'error');
+            }
+        }
+    });
+}
+
+async function runServerPoweron(planId, serverId, serverName) {
+    swalEnging.fire({
+        title: `Religar Alvo [${serverName}]?`,
+        html: `
+            <div class="text-left space-y-2 text-xs">
+                <p class="text-slate-700">Esta ação enviará imediatamente:</p>
+                <ul class="list-disc list-inside space-y-1 text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    <li>Pacote Wake-on-LAN / IPMI para ligar a máquina física (se configurado)</li>
+                    <li>Comandos de inicialização (qm start / pct start / vim-cmd power.on) para todas as VMs/CTs selecionadas</li>
+                </ul>
+            </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonColor: '#059669',
+        denyButtonColor: '#223546',
+        confirmButtonText: '⚡ Religar Imediatamente',
+        denyButtonText: 'Simulação Apenas (Dry-Run)',
+        cancelButtonText: 'Cancelar'
+    }).then(async (result) => {
+        if (result.isConfirmed || result.isDenied) {
+            const dry_run = result.isDenied;
+            swalEnging.fire({
+                title: dry_run ? 'Simulando Religamento...' : 'Enviando Comandos...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            try {
+                const res = await fetch(`/api/plans/${planId}/server/${serverId}/poweron`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dry_run })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    swalEnging.fire({
+                        icon: 'success',
+                        title: dry_run ? 'Simulação de Religamento OK' : 'Comandos de Religamento Enviados',
+                        html: `<p class="text-xs text-slate-700">${escapeHtml(data.message || '')}</p>`
+                    });
+                    loadPlansData();
+                } else {
+                    swalEnging.fire('Erro', data.message || 'Falha ao religar alvo', 'error');
+                }
+            } catch (e) {
+                swalEnging.fire('Erro', 'Falha na comunicação: ' + e, 'error');
+            }
+        }
+    });
+}
+
 async function openLogsModal() {
     try {
         const res = await fetch('/api/plans/logs', { cache: 'no-cache' });
@@ -2687,6 +2963,8 @@ function renderAlertsUI() {
                     if (ch === 'whatsapp') return `<span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">WhatsApp</span>`;
                     if (ch === 'email') return `<span class="px-2 py-0.5 rounded-md bg-blue-50 text-enging-blue border border-blue-200 text-[10px] font-bold">Email</span>`;
                     if (ch === 'sms') return `<span class="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold">SMS</span>`;
+                    if (ch === 'teams') return `<span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">Teams</span>`;
+                    if (ch === 'google_chat' || ch === 'google') return `<span class="px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-bold">Google Chat</span>`;
                     if (ch === 'webhook') return `<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">Webhook</span>`;
                     return '';
                 }).join(' ');
@@ -2697,6 +2975,8 @@ function renderAlertsUI() {
                 else if (r.trigger_type === 'battery_level_low') triggerDesc = `Bateria ≤ ${r.threshold_val}%`;
                 else if (r.trigger_type === 'high_load') triggerDesc = `Carga da UPS ≥ ${r.threshold_val}%`;
                 else if (r.trigger_type === 'alarm_active') triggerDesc = 'Alarme / Falha Interna';
+                else if (r.trigger_type === 'ups_disconnected') triggerDesc = '🔌 Perda de Leitura / UPS Desconectada';
+                else if (r.trigger_type === 'ups_reconnected') triggerDesc = '🔗 Comunicação UPS Restabelecida';
 
                 return `
                     <div class="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col justify-between space-y-4">
@@ -2880,6 +3160,8 @@ function openCreateAlertRuleModal(ruleId = null) {
                             <option value="high_load" ${r.trigger_type === 'high_load' ? 'selected' : ''}>⚡ Sobrecarga de Consumo da UPS (≥ X %)</option>
                             <option value="input_voltage_range" ${r.trigger_type === 'input_voltage_range' ? 'selected' : ''}>⚠️ Subtensão ou Sobretensão na Entrada AC</option>
                             <option value="alarm_active" ${r.trigger_type === 'alarm_active' ? 'selected' : ''}>🔔 Alarme Interno ou Falha Reportada pelo UPS</option>
+                            <option value="ups_disconnected" ${r.trigger_type === 'ups_disconnected' ? 'selected' : ''}>🔌 Falha de Comunicação / UPS Desconectada</option>
+                            <option value="ups_reconnected" ${r.trigger_type === 'ups_reconnected' ? 'selected' : ''}>🔗 Comunicação com a UPS Restabelecida</option>
                         </select>
                     </div>
                 </div>
@@ -3181,6 +3463,26 @@ function openCreateAlertRuleModal(ruleId = null) {
                     battVal = '95%';
                     voltIn = '230.0 V';
                     modeVal = 'ALARME UPS';
+                } else if (trigger === 'ups_disconnected') {
+                    triggerDesc = 'Perda de comunicação física/driver com a UPS via /dev/ttyUSB0';
+                    battVal = 'N/D (Sem Leitura)';
+                    voltBat = 'N/D';
+                    voltIn = 'N/D';
+                    freqIn = 'N/D';
+                    voltOut = 'N/D';
+                    loadVal = 'N/D';
+                    powVal = 'N/D';
+                    modeVal = 'DESCONECTADO (Sem Telemetria)';
+                } else if (trigger === 'ups_reconnected') {
+                    triggerDesc = 'Comunicação e leitura de telemetria da UPS restabelecidas com sucesso.';
+                    battVal = '100%';
+                    voltBat = '216.0 V';
+                    voltIn = '231.6 V';
+                    freqIn = '50.0 Hz';
+                    voltOut = '240.0 V';
+                    loadVal = '17%';
+                    powVal = '1020 W';
+                    modeVal = 'ONLINE (OL)';
                 }
 
                 const nowStr = new Date().toLocaleString('pt-PT');

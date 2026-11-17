@@ -59,6 +59,7 @@ class NutClient:
             
             f = self.sock.makefile("r", encoding="utf-8", errors="ignore")
             raw_vars: Dict[str, str] = {}
+            err_msg = None
             
             for line in f:
                 line = line.strip()
@@ -69,8 +70,16 @@ class NutClient:
                         var_key = parts[2]
                         var_val = parts[3].strip('"')
                         raw_vars[var_key] = var_val
-                elif line.startswith("END LIST VAR") or line.startswith("ERR"):
+                elif line.startswith("ERR"):
+                    err_msg = line
                     break
+                elif line.startswith("END LIST VAR"):
+                    break
+                    
+            if err_msg:
+                raise ConnectionError(f"Erro reportado pelo daemon NUT: {err_msg}")
+            if not raw_vars:
+                raise ConnectionError(f"Nenhuma variável retornada para a UPS '{self.ups_name}' (driver desconectado ou sem dados)")
                     
             return self._parse_nut_data(raw_vars)
         except Exception as e:

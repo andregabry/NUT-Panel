@@ -13,6 +13,11 @@ from shutdown_manager import ShutdownManager
 from auth_manager import AuthManager
 from alert_manager import AlertManager
 from connections_manager import ConnectionsManager
+from db import db
+import os
+
+# Migração de ficheiros legados JSON para SQLite de forma segura e atómica
+db.migrate_from_json(os.path.dirname(os.path.abspath(__file__)))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -71,8 +76,8 @@ def nut_polling_worker():
                 latest_data = data
                 consecutive_errors = 0
                 
-                # Adicionar ponto ao histórico
-                history_buffer.append({
+                # Adicionar ponto ao histórico em memória e SQLite
+                history_point = {
                     "timestamp": data["timestamp"],
                     "time": data["formatted_time"],
                     "load_pct": data["output"]["load_pct"],
@@ -81,7 +86,12 @@ def nut_polling_worker():
                     "output_voltage": data["output"]["voltage"],
                     "battery_charge": data["battery"]["charge_pct"],
                     "battery_voltage": data["battery"]["voltage"]
-                })
+                }
+                history_buffer.append(history_point)
+                try:
+                    db.add_telemetry(data)
+                except Exception as ex:
+                    logger.debug(f"Erro ao persistir telemetria no SQLite: {ex}")
 
             # Verificar gatilhos de múltiplos planos de desligamento
             shutdown_manager.check_nut_triggers(data)
@@ -117,6 +127,12 @@ def nut_polling_worker():
                     "error": str(e),
                     "timestamp": time.time()
                 }
+
+            # Avaliar regras de desconexão e notificar se a leitura permanecer inativa
+            try:
+                alert_manager.check_nut_alerts(latest_data)
+            except Exception as alert_err:
+                logger.error(f"Erro ao verificar alertas de desconexão: {alert_err}")
         
         time.sleep(Config.POLL_INTERVAL)
 
@@ -184,6 +200,13 @@ def api_status():
 @app.route("/api/history")
 @login_required
 def api_history():
+    limit = request.args.get("limit", 120, type=int)
+    try:
+        db_history = db.get_telemetry_history(limit=limit)
+        if db_history:
+            return jsonify(db_history)
+    except Exception as e:
+        logger.warning(f"Erro ao consultar histórico no SQLite: {e}")
     with state_lock:
         return jsonify(list(history_buffer))
 
@@ -298,6 +321,28 @@ def trigger_single_plan(plan_id):
 def cancel_single_plan(plan_id):
     shutdown_manager.cancel_plan(plan_id)
     return jsonify({"success": True, "message": "Cancelamento solicitado"})
+
+@app.route("/api/plans/<plan_id>/poweron", methods=["POST"])
+@login_required
+def trigger_poweron_plan(plan_id):
+    body = request.get_json(silent=True) or {}
+    dry_run = body.get("dry_run", False) or (request.args.get("dry_run") == "true")
+    shutdown_manager.run_poweron_plan_async(plan_id, dry_run=dry_run)
+    return jsonify({"success": True, "message": "Rotina de religamento iniciada"})
+
+@app.route("/api/plans/<plan_id>/server/<server_id>/poweron", methods=["POST"])
+@login_required
+def execute_plan_server_poweron(plan_id, server_id):
+    body = request.get_json(silent=True) or {}
+    dry_run = body.get("dry_run", False) or (request.args.get("dry_run") == "true")
+    plan = shutdown_manager.get_plan_by_id(plan_id)
+    if not plan:
+        return jsonify({"success": False, "message": "Plano não encontrado"}), 404
+    server = next((s for s in plan.get("servers", []) if s.get("id") == server_id), None)
+    if not server:
+        return jsonify({"success": False, "message": "Servidor não encontrado"}), 404
+    res = shutdown_manager.execute_poweron_server(server, plan_name=plan.get("name", ""), dry_run=dry_run)
+    return jsonify(res)
 
 @app.route("/api/plans/<plan_id>/test-notification", methods=["POST"])
 @login_required
